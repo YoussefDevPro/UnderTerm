@@ -64,4 +64,15 @@ impl Map {
             height,
         })
     }
+
+    pub fn toggle_wall(&mut self, x: u32, y: u32) {
+        let pos = (x, y);
+        if let Some(index) = self.walls.iter().position(|&p| p == pos) {
+            // Wall exists, remove it
+            self.walls.remove(index);
+        } else {
+            // Wall does not exist, add it
+            self.walls.push(pos);
+        }
+    }
 }

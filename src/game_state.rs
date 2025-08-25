@@ -17,6 +17,7 @@ pub struct GameState {
     pub message: String,
     pub show_message: bool,
     pub show_debug_panel: bool, // Added this line
+    pub sound_error: Option<String>, // New field for sound errors
     #[serde(skip)]
     pub loaded_maps: std::collections::HashMap<(i32, i32), Map>,
     pub debug_mode: bool,
@@ -48,6 +49,7 @@ impl GameState {
             loaded_maps,
             debug_mode: false,
             show_debug_panel: false, // Added this line
+            sound_error: None, // Initialize sound_error
             current_map_row,
             current_map_col,
         }
@@ -119,8 +121,16 @@ impl GameState {
                     self.player.direction = PlayerDirection::Right;
                     self.player.is_walking = true;
                 }
-                KeyCode::Char('d') | KeyCode::Char('D') => {
-                    self.show_debug_panel = !self.show_debug_panel;
+                
+                KeyCode::Enter => {
+                    if self.debug_mode {
+                        let current_map_key = (self.current_map_row, self.current_map_col);
+                        if let Some(map_to_modify) = self.loaded_maps.get_mut(&current_map_key) {
+                            map_to_modify.toggle_wall(self.player.x as u32, self.player.y as u32);
+                            self.message = format!("Toggled wall at ({}, {})", self.player.x, self.player.y);
+                            self.show_message = true;
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -197,33 +207,40 @@ impl GameState {
             // --- End Map Transition Logic ---
 
             let (_, player_sprite_width, player_sprite_height) = self.player.get_sprite_content();
-            let collision_box_height = 3;
-            let collision_box_start_y = new_player_y.saturating_add(player_sprite_height).saturating_sub(collision_box_height);
+            
+            if !self.debug_mode {
+                let collision_box_height = 3;
+                let collision_box_start_y = new_player_y.saturating_add(player_sprite_height).saturating_sub(collision_box_height);
 
-            let mut collision = false;
-            for y_offset in 0..collision_box_height {
-                let check_y = collision_box_start_y.saturating_add(y_offset);
-                for x_offset in 0..player_sprite_width {
-                    let check_x = new_player_x.saturating_add(x_offset);
+                let mut collision = false;
+                for y_offset in 0..collision_box_height {
+                    let check_y = collision_box_start_y.saturating_add(y_offset);
+                    for x_offset in 0..player_sprite_width {
+                        let check_x = new_player_x.saturating_add(x_offset);
 
-                    // Get the map for collision check
-                    let collision_map_key = (self.current_map_row, self.current_map_col);
-                    if let Some(collision_map) = self.loaded_maps.get(&collision_map_key) {
-                        if collision_map.walls.contains(&(check_x as u32, check_y as u32)) {
-                            collision = true;
-                            break;
+                        // Get the map for collision check
+                        let collision_map_key = (self.current_map_row, self.current_map_col);
+                        if let Some(collision_map) = self.loaded_maps.get(&collision_map_key) {
+                            if collision_map.walls.contains(&(check_x as u32, check_y as u32)) {
+                                collision = true;
+                                break;
+                            }
                         }
                     }
+                    if collision { break; }
                 }
-                if collision { break; }
-            }
 
-            if collision {
-                self.message = "You hit a wall!".to_string();
-                self.show_message = true;
-                // Do not update player position if collision occurs
+                if collision {
+                    self.message = "You hit a wall!".to_string();
+                    self.show_message = true;
+                    // Do not update player position if collision occurs
+                } else {
+                    // Clamp player position to map boundaries, considering sprite size
+                    self.player.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
+                    self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height).saturating_sub(1));
+                }
             } else {
-                // Clamp player position to map boundaries, considering sprite size
+                // In debug mode, allow walking through walls
                 self.player.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
                 self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height).saturating_sub(1));
             }

@@ -17,6 +17,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Clear},
     Terminal,
 };
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Source};
+use ansi_to_tui::IntoText; // Add this line
 mod game_state;
 mod player;
 mod utils;
@@ -48,6 +50,8 @@ fn run_app() -> io::Result<()> {
     let mut last_frame_time = Instant::now();
     let mut last_animation_update = Instant::now();
 
+    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+
     loop {
         let elapsed_time = last_frame_time.elapsed();
         if elapsed_time >= Duration::from_millis(1000 / FRAME_RATE) {
@@ -58,6 +62,16 @@ fn run_app() -> io::Result<()> {
                 if key.code == KeyCode::Char('q') {
                     game_state.save_game_state()?;
                     return Ok(());
+                } else if key.code == KeyCode::F(1) {
+                    game_state.show_debug_panel = !game_state.show_debug_panel;
+                    if game_state.show_debug_panel {
+                        // Play sound
+                        let file = std::fs::File::open("assets/sound/open_settings.mp3").unwrap();
+                        let decoder = rodio::Decoder::new(std::io::BufReader::new(file)).unwrap();
+                        stream_handle.play_raw(decoder.convert_samples()).unwrap();
+                    }
+                } else if key.code == KeyCode::F(2) {
+                    game_state.debug_mode = !game_state.debug_mode;
                 }
                 key_code = Some(key.code);
             }
@@ -124,9 +138,38 @@ fn run_app() -> io::Result<()> {
                             }
                         }
                     }
+
+                    // Draw spawn point 'S'
+                    let spawn_x = current_map.player_spawn.0;
+                    let spawn_y = current_map.player_spawn.1;
+
+                    let spawn_x_on_screen = spawn_x.saturating_sub(game_state.camera_x as u32);
+                    let spawn_y_on_screen = spawn_y.saturating_sub(game_state.camera_y as u32);
+
+                    if spawn_x_on_screen < size.width as u32 && spawn_y_on_screen < size.height as u32 {
+                        let draw_rect = ratatui::layout::Rect::new(
+                            spawn_x_on_screen as u16,
+                            spawn_y_on_screen as u16,
+                            1,
+                            1,
+                        );
+                        let clamped_rect = draw_rect.intersection(size);
+                        if !clamped_rect.is_empty() {
+                            let spawn_paragraph = Paragraph::new("S")
+                                .style(Style::default().fg(Color::Green).bg(Color::Black));
+                            frame.render_widget(
+                                spawn_paragraph,
+                                clamped_rect,
+                            );
+                        }
+                    }
                 }
 
-                let (player_sprite_content, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
+                let (player_sprite_content, player_sprite_width, player_sprite_height) = if game_state.debug_mode {
+                    ("P".to_string().as_bytes().into_text().unwrap(), 1u16, 1u16) // 'P' is 1x1
+                } else {
+                    game_state.player.get_sprite_content()
+                };
                 let player_paragraph = Paragraph::new(player_sprite_content);
 
                 let player_draw_rect = ratatui::layout::Rect::new(
