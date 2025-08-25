@@ -1,100 +1,84 @@
 use crate::player::{Player, PlayerDirection};
-use crate::utils::text_to_ansi_string;
-use crate::PLAYER_SPEED;
-use ansi_to_tui::IntoText;
+use crate::{PLAYER_SPEED, PLAYER_HORIZONTAL_SPEED};
+use crate::map::Map;
 use crossterm::event::KeyCode;
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
 use serde::{Deserialize, Serialize};
 use std::io::{self};
+use std::collections::HashMap;
+use ratatui::text::Text;
 
-use unicode_width::UnicodeWidthStr;
+use ansi_to_tui::IntoText;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub player: Player,
-    pub map_raw_data: String, // Store map as a Text object
     pub camera_x: u16,
     pub camera_y: u16,
-    pub map_width: u16,
-    pub map_height: u16,
     pub message: String,
     pub show_message: bool,
-    pub spawn_x: u16,
-    pub spawn_y: u16,
-    pub auto_draw_enabled: bool,
-    pub previous_player_x: u16,
-    pub previous_player_y: u16,
-    pub wall_grid: Vec<Vec<bool>>,
+    pub show_debug_panel: bool, // Added this line
+    #[serde(skip)]
+    pub loaded_maps: std::collections::HashMap<(i32, i32), Map>,
+    pub debug_mode: bool,
+    pub current_map_name: String,
+    pub current_map_row: i32,
+    pub current_map_col: i32,
 }
 
 impl GameState {
-    pub fn new() -> io::Result<Self> {
-        let map_data_raw = std::fs::read_to_string("assets/sprites/map/map_1/sprite.ans")?;
-        let map_text_for_dimensions = map_data_raw.as_bytes().into_text().unwrap();
+    pub fn from_map(map: Map) -> Self {
+        let player_spawn_x = map.player_spawn.0;
+        let player_spawn_y = map.player_spawn.1;
 
-        let map_height = {
-            let mut actual_height = 0;
-            for (i, line) in map_text_for_dimensions.lines.iter().enumerate() {
-                if !line.spans.iter().all(|span| span.content.trim().is_empty()) {
-                    actual_height = i + 1;
-                }
-            }
-            actual_height as u16
-        };
+        // Parse row and col from map.name
+        let map_parts: Vec<&str> = map.name.split('_').collect();
+        let current_map_row: i32 = map_parts[1].parse().unwrap_or(0);
+        let current_map_col: i32 = map_parts[2].parse().unwrap_or(0);
 
-        let mut max_width = 0;
-        for line in map_text_for_dimensions.lines.iter() {
-            let line_width = line.width() as u16;
-            if line_width > max_width {
-                max_width = line_width;
-            }
-        }
-        let map_width = max_width;
+        let mut loaded_maps = HashMap::new();
+        loaded_maps.insert((current_map_row, current_map_col), map);
 
-        let wall_grid = vec![vec![false; map_width as usize]; map_height as usize];
-
-        Ok(GameState {
-            player: Player::new(map_width / 2, map_height / 2),
-            map_raw_data: map_data_raw,
+        GameState {
+            player: Player::new(player_spawn_x as u16, player_spawn_y as u16),
             camera_x: 0,
             camera_y: 0,
-            map_width,
-            map_height,
             message: String::new(),
             show_message: false,
-            spawn_x: map_width / 2,
-            spawn_y: map_height / 2,
-            auto_draw_enabled: false,
-            previous_player_x: map_width / 2,
-            previous_player_y: map_height / 2,
-            wall_grid,
-        })
-    }
-
-    pub fn reset_map(&mut self) -> io::Result<()> {
-        let map_data_raw = std::fs::read_to_string("assets/sprites/map/map_1/sprite.ans")?;
-        self.map_raw_data = map_data_raw;
-        let updated_map_content = self.map_raw_data.clone();
-        std::fs::write("assets/sprites/map/map_1/sprite.ans", updated_map_content)?;
-        Ok(())
+            current_map_name: format!("map_{}_{}", current_map_row, current_map_col),
+            loaded_maps,
+            debug_mode: false,
+            show_debug_panel: false, // Added this line
+            current_map_row,
+            current_map_col,
+        }
     }
 
     pub fn save_game_state(&self) -> io::Result<()> {
-        let serialized = serde_json::to_string(&self)?;
+        let save_data = SaveData {
+            player_x: self.player.x,
+            player_y: self.player.y,
+            current_map_name: self.current_map_name.clone(),
+        };
+        let serialized = serde_json::to_string(&save_data)?;
         std::fs::write("game_data.json", serialized)?;
         Ok(())
     }
 
     pub fn load_game_state() -> io::Result<Self> {
-        let default_state = GameState::new()?;
         match std::fs::read_to_string("game_data.json") {
             Ok(data) => {
-                let deserialized: GameState = serde_json::from_str(&data)?;
-                Ok(deserialized)
+                let deserialized: SaveData = serde_json::from_str(&data)?;
+                let map = Map::load(&deserialized.current_map_name)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to load map: {}", e)))?;
+                let mut game_state = GameState::from_map(map);
+                game_state.player.x = deserialized.player_x;
+                game_state.player.y = deserialized.player_y;
+                Ok(game_state)
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                let map = Map::load("map_0_0")
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to load default map: {}", e)))?;
+                let default_state = GameState::from_map(map);
                 default_state.save_game_state()?;
                 Ok(default_state)
             }
@@ -106,85 +90,130 @@ impl GameState {
         self.player.is_walking = false;
         self.show_message = false;
 
+        // Get the current map from loaded_maps
+        let current_map_key = (self.current_map_row, self.current_map_col);
+        let current_map = self.loaded_maps.get(&current_map_key).cloned().unwrap(); // Get the current map
+
         if let Some(key) = key_code {
-            let mut new_x = self.player.x;
-            let mut new_y = self.player.y;
+            let mut new_player_x = self.player.x;
+            let mut new_player_y = self.player.y;
 
             match key {
                 KeyCode::Up => {
-                    new_y = new_y.saturating_sub(PLAYER_SPEED);
+                    new_player_y = new_player_y.saturating_sub(PLAYER_SPEED);
                     self.player.direction = PlayerDirection::Back;
                     self.player.is_walking = true;
                 }
                 KeyCode::Down => {
-                    new_y = new_y.saturating_add(PLAYER_SPEED);
+                    new_player_y = new_player_y.saturating_add(PLAYER_SPEED);
                     self.player.direction = PlayerDirection::Front;
                     self.player.is_walking = true;
                 }
                 KeyCode::Left => {
-                    new_x = new_x.saturating_sub(PLAYER_SPEED);
+                    new_player_x = new_player_x.saturating_sub(PLAYER_HORIZONTAL_SPEED);
                     self.player.direction = PlayerDirection::Left;
                     self.player.is_walking = true;
                 }
                 KeyCode::Right => {
-                    new_x = new_x.saturating_add(PLAYER_SPEED);
+                    new_player_x = new_player_x.saturating_add(PLAYER_HORIZONTAL_SPEED);
                     self.player.direction = PlayerDirection::Right;
                     self.player.is_walking = true;
                 }
-                KeyCode::Enter => {
-                    self.auto_draw_enabled = !self.auto_draw_enabled;
-                    if self.auto_draw_enabled {
-                        self.message = "Auto-draw enabled!".to_string();
-                    } else {
-                        self.message = "Auto-draw disabled!".to_string();
-                    }
-                    self.show_message = true;
-                }
-                KeyCode::Char('r') | KeyCode::Char('R') => {
-                    if let Err(e) = self.reset_map() {
-                        eprintln!("Failed to reset map: {:?}", e);
-                    }
-                    self.message = "Map reset!".to_string();
-                    self.show_message = true;
-                }
-                KeyCode::Char('s') | KeyCode::Char('S') => {
-                    self.spawn_x = self.player.x;
-                    self.spawn_y = self.player.y;
-                    self.message =
-                        format!("Spawn point set to ({}, {})", self.spawn_x, self.spawn_y);
-                    self.show_message = true;
+                KeyCode::Char('d') | KeyCode::Char('D') => {
+                    self.show_debug_panel = !self.show_debug_panel;
                 }
                 _ => {}
             }
 
-            // Collision detection
+            // --- Map Transition Logic ---
+            let mut transitioned = false;
+            let mut next_map_row = self.current_map_row;
+            let mut next_map_col = self.current_map_col;
+
+            // Store original player position before potential map transition
+            let original_player_x = self.player.x;
+            let original_player_y = self.player.y;
+
+            // Check for transition to new map
+            if new_player_x >= current_map.width { // Moving right
+                next_map_col += 1;
+                new_player_x = 0; // Reset player to left edge of new map
+                transitioned = true;
+            } else if self.player.x == 0 && key == KeyCode::Left { // Moving left from edge
+                if self.current_map_col > 0 {
+                    next_map_col -= 1;
+                    new_player_x = current_map.width - 1; // Reset player to right edge of new map
+                    transitioned = true;
+                } else {
+                    new_player_x = 0; // Clamp at left edge of map 0_0
+                }
+            }
+
+            if new_player_y >= current_map.height { // Moving down
+                next_map_row += 1;
+                new_player_y = 0; // Reset player to top edge of new map
+                transitioned = true;
+            } else if self.player.y == 0 && key == KeyCode::Up { // Moving up from edge
+                if self.current_map_row > 0 {
+                    next_map_row -= 1;
+                    new_player_y = current_map.height - 1; // Reset player to bottom edge of new map
+                    transitioned = true;
+                } else {
+                    new_player_y = 0; // Clamp at top edge of map 0_0
+                }
+            }
+
+            if transitioned {
+                let new_map_name = format!("map_{}_{}", next_map_row, next_map_col);
+                let new_map_key = (next_map_row, next_map_col);
+
+                // Check if the map is already loaded
+                if !self.loaded_maps.contains_key(&new_map_key) {
+                    match Map::load(&new_map_name) {
+                        Ok(new_map) => {
+                            self.loaded_maps.insert(new_map_key, new_map);
+                        }
+                        Err(e) => {
+                            // If map doesn't exist, revert player position and show message
+                            self.message = format!("Cannot enter {}: {}", new_map_name, e);
+                            self.show_message = true;
+                            // Revert player position to stay on current map
+                            self.player.x = original_player_x;
+                            self.player.y = original_player_y;
+                            return; // Exit update early to prevent further processing with invalid map
+                        }
+                    }
+                }
+                // Update current map coordinates
+                self.current_map_name = new_map_name;
+                self.current_map_row = next_map_row;
+                self.current_map_col = next_map_col;
+                self.player.x = new_player_x;
+                self.player.y = new_player_y;
+                self.message = format!("Entered {}", self.current_map_name);
+                self.show_message = true;
+            }
+
+            // --- End Map Transition Logic ---
+
             let (_, player_sprite_width, player_sprite_height) = self.player.get_sprite_content();
             let collision_box_height = 3;
-            let collision_box_start_y = new_y.saturating_add(player_sprite_height).saturating_sub(collision_box_height);
+            let collision_box_start_y = new_player_y.saturating_add(player_sprite_height).saturating_sub(collision_box_height);
 
             let mut collision = false;
             for y_offset in 0..collision_box_height {
                 let check_y = collision_box_start_y.saturating_add(y_offset);
                 for x_offset in 0..player_sprite_width {
-                    let check_x = new_x.saturating_add(x_offset);
+                    let check_x = new_player_x.saturating_add(x_offset);
 
-                    let map_text = self.map_raw_data.as_bytes().into_text().unwrap();
-                    if let Some(line) = map_text.lines.get(check_y as usize) {
-                        let mut current_char_idx = 0;
-                        for span in line.spans.iter() {
-                            let span_len_chars = span.content.width() as u16;
-                            if check_x >= current_char_idx && check_x < current_char_idx + span_len_chars {
-                                if let Some(char) = span.content.chars().nth((check_x - current_char_idx) as usize) {
-                                    if char == '█' {
-                                        collision = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            current_char_idx += span_len_chars;
+                    // Get the map for collision check
+                    let collision_map_key = (self.current_map_row, self.current_map_col);
+                    if let Some(collision_map) = self.loaded_maps.get(&collision_map_key) {
+                        if collision_map.walls.contains(&(check_x as u32, check_y as u32)) {
+                            collision = true;
+                            break;
                         }
                     }
-                    if collision { break; }
                 }
                 if collision { break; }
             }
@@ -192,98 +221,53 @@ impl GameState {
             if collision {
                 self.message = "You hit a wall!".to_string();
                 self.show_message = true;
-                return; // Exit update early, or just don't update x/y
+                // Do not update player position if collision occurs
+            } else {
+                // Clamp player position to map boundaries, considering sprite size
+                self.player.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
+                self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height).saturating_sub(1));
             }
-
-            self.player.x = new_x.min(self.map_width - 1); // Ensure player stays within map bounds
-            self.player.y = new_y.min(self.map_height - 1); // Ensure player stays within map bounds
-
-            // Auto-draw logic
-            if self.auto_draw_enabled
-                && (self.player.x != self.previous_player_x
-                    || self.player.y != self.previous_player_y)
-            {
-                let player_x = self.previous_player_x as usize;
-                let player_y = self.previous_player_y as usize;
-
-                // Convert raw ANSI map data to Text for modification
-                let mut map_text_editable = self.map_raw_data.as_bytes().into_text().unwrap();
-
-                if let Some(line) = map_text_editable.lines.get_mut(player_y) {
-                    let mut new_spans: Vec<Span> = Vec::new();
-                    let mut current_char_idx = 0;
-
-                    for span in line.spans.drain(..) {
-                        let span_len_chars = span.content.width() as usize;
-
-                        // Case 1: Wall is before this span
-                        if player_x < current_char_idx {
-                            new_spans.push(span);
-                        }
-                        // Case 2: Wall is within this span
-                        else if player_x >= current_char_idx
-                            && player_x < current_char_idx + span_len_chars
-                        {
-                            // Split the span into three parts: before wall, wall, after wall
-                            let wall_char = '█';
-                            let wall_style = Style::default().fg(Color::Rgb(255, 0, 255));
-
-                            let char_offset_in_span = player_x - current_char_idx;
-
-                            // Part before the wall
-                            if char_offset_in_span > 0 {
-                                let before_wall_content: String =
-                                    span.content.chars().take(char_offset_in_span).collect();
-                                new_spans.push(Span::styled(before_wall_content, span.style));
-                            }
-
-                            // The wall itself
-                            new_spans.push(Span::styled(wall_char.to_string(), wall_style));
-
-                            // Part after the wall
-                            if char_offset_in_span + 1 < span_len_chars {
-                                let after_wall_content: String =
-                                    span.content.chars().skip(char_offset_in_span + 1).collect();
-                                new_spans.push(Span::styled(after_wall_content, span.style));
-                            }
-                        }
-                        // Case 3: Wall is after this span
-                        else {
-                            new_spans.push(span);
-                        }
-                        current_char_idx += span_len_chars;
-                    }
-                    line.spans = new_spans; // Replace with new spans
-                }
-
-                // Convert modified Text back to ANSI string
-                self.map_raw_data = text_to_ansi_string(&map_text_editable);
-
-                // Save the updated map to file
-                if let Err(e) =
-                    std::fs::write("assets/sprites/map/map_1/sprite.ans", &self.map_raw_data)
-                {
-                    eprintln!("Failed to save map: {:?}", e);
-                }
-            }
-
-            // Update previous player position for next frame
-            self.previous_player_x = self.player.x;
-            self.previous_player_y = self.player.y;
         }
 
         self.player.update_animation();
 
-        // Update camera to follow player
-        let mut new_camera_x = self.player.x.saturating_sub(frame_size.width / 2);
-        let mut new_camera_y = self.player.y.saturating_sub(frame_size.height / 2);
+        // Re-implement continuous camera logic
+        // Calculate the desired camera position to center the player
+        // Consider player sprite's center for more accurate centering
+        let (_player_sprite_content, player_sprite_width, player_sprite_height) = self.player.get_sprite_content();
 
-        // Clamp camera position to map boundaries
-        new_camera_x = new_camera_x.min(self.map_width.saturating_sub(frame_size.width));
-        new_camera_y = new_camera_y.min(self.map_height.saturating_sub(frame_size.height));
+        let player_center_x = self.player.x + player_sprite_width / 2;
+        let player_center_y = self.player.y + player_sprite_height / 2;
 
-        // Ensure camera coordinates are not negative
-        self.camera_x = new_camera_x.max(0);
-        self.camera_y = new_camera_y.max(0);
+        let mut new_camera_x = player_center_x.saturating_sub(frame_size.width / 2);
+        let mut new_camera_y = player_center_y.saturating_sub(frame_size.height / 2);
+
+        // Clamp camera to map boundaries
+        // Ensure camera does not go beyond the map's right/bottom edge
+        new_camera_x = new_camera_x.min(current_map.width.saturating_sub(frame_size.width));
+        new_camera_y = new_camera_y.min(current_map.height.saturating_sub(frame_size.height));
+
+        // Ensure camera does not go below 0
+        new_camera_x = new_camera_x.max(0);
+        new_camera_y = new_camera_y.max(0);
+
+        self.camera_x = new_camera_x;
+        self.camera_y = new_camera_y;
     }
+
+    pub fn get_combined_map_text(&self, _frame_size: ratatui::layout::Rect) -> Text<'static> {
+        let current_map_key = (self.current_map_row, self.current_map_col);
+        if let Some(map_chunk) = self.loaded_maps.get(&current_map_key) {
+            map_chunk.ansi_sprite.as_bytes().into_text().unwrap_or_default()
+        } else {
+            Text::default()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SaveData {
+    player_x: u16,
+    player_y: u16,
+    current_map_name: String,
 }

@@ -51,51 +51,45 @@ impl Player {
 
     pub fn get_sprite_path(&self) -> String {
         let base_path = "assets/sprites/frisk/";
-        let (dir_str, anim_str) = match self.direction {
-            PlayerDirection::Front => (
-                "front",
+        let (sub_dir, anim_file) = match self.direction {
+            PlayerDirection::Front => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => "walk_front_1.ans",
-                        1 => "idle_front.ans",
-                        2 => "walk_front_2.ans",
-                        _ => "idle_front.ans",
+                        0 => ("walk", "frisk_walk_front_1.ans"),
+                        1 => ("walk", "frisk_walk_front_2.ans"),
+                        _ => ("idle", "frisk_idle_front.ans"), // Fallback
                     }
                 } else {
-                    "idle_front.ans"
-                },
-            ),
-            PlayerDirection::Back => (
-                "back",
+                    ("idle", "frisk_idle_front.ans")
+                }
+            },
+            PlayerDirection::Back => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => "walk_back_1.ans",
-                        1 => "idle_back.ans",
-                        2 => "walk_back_2.ans",
-                        _ => "idle_back.ans",
+                        0 => ("walk", "frisk_walk_back_1.ans"),
+                        1 => ("walk", "frisk_walk_back_2.ans"),
+                        _ => ("idle", "frisk_idle_back.ans"), // Fallback
                     }
                 } else {
-                    "idle_back.ans"
-                },
-            ),
-            PlayerDirection::Left => (
-                "left",
+                    ("idle", "frisk_idle_back.ans")
+                }
+            },
+            PlayerDirection::Left => {
                 if self.is_walking {
-                    "walk_left.ans"
+                    ("walk", "frisk_walk_left.ans")
                 } else {
-                    "idle_left.ans"
-                },
-            ),
-            PlayerDirection::Right => (
-                "right",
+                    ("idle", "frisk_idle_left.ans")
+                }
+            },
+            PlayerDirection::Right => {
                 if self.is_walking {
-                    "walk_right.ans"
+                    ("walk", "frisk_walk_right.ans")
                 } else {
-                    "idle_right.ans"
-                },
-            ),
+                    ("idle", "frisk_idle_right.ans")
+                }
+            },
         };
-        format!("{}{}/{}", base_path, dir_str, anim_str)
+        format!("{}{}/{}", base_path, sub_dir, anim_file)
     }
 
     pub fn update_animation(&mut self) {

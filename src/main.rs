@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ansi_to_tui::IntoText;
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -15,21 +14,19 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Clear},
     Terminal,
-    prelude::Widget,
 };
 mod game_state;
 mod player;
 mod utils;
-
-
+mod map;
 
 use crate::game_state::GameState;
 
-const PLAYER_SPEED: u16 = 1; // Pixels per frame
-const FRAME_RATE: u64 = 120; // Frames per second
+const PLAYER_SPEED: u16 = 1;
+const PLAYER_HORIZONTAL_SPEED: u16 = 2;
+const FRAME_RATE: u64 = 120;
 const ANIMATION_FRAME_DURATION: Duration = Duration::from_millis(200);
 
 fn run_app() -> io::Result<()> {
@@ -46,8 +43,6 @@ fn run_app() -> io::Result<()> {
     });
 
     let mut game_state = GameState::load_game_state()?;
-    game_state.player.x = game_state.spawn_x;
-    game_state.player.y = game_state.spawn_y;
     game_state.player.is_walking = false;
     game_state.player.animation_frame = 0;
     let mut last_frame_time = Instant::now();
@@ -85,7 +80,7 @@ fn run_app() -> io::Result<()> {
                 game_state.player.update_animation();
                 last_animation_update = Instant::now();
             } else if !game_state.player.is_walking {
-                game_state.player.animation_frame = 0; // Reset animation frame when not walking
+                game_state.player.animation_frame = 0;
             }
 
             terminal.draw(|frame| {
@@ -94,83 +89,103 @@ fn run_app() -> io::Result<()> {
                 let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
                 let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
 
-                let mut temp_buffer = ratatui::buffer::Buffer::empty(size);
+                // Get the combined map text from GameState
+                let combined_map_text = game_state.get_combined_map_text(size);
 
-                let mut processed_map_text = Text::default();
-                let original_map_text = game_state.map_raw_data.as_bytes().into_text().unwrap();
+                let map_paragraph = Paragraph::new(combined_map_text)
+                    .scroll((game_state.camera_y, game_state.camera_x)); // Use camera_y and camera_x
+                frame.render_widget(map_paragraph, size);
 
-                for line in original_map_text.lines {
-                    let mut new_spans = Vec::new();
-                    for span in line.spans {
-                        if span.content == "█" {
-                            new_spans.push(Span::styled(" ".to_string(), span.style.bg(Color::Black)));
-                        } else {
-                            new_spans.push(span.clone());
+                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                let current_map = game_state.loaded_maps.get(&current_map_key).unwrap();
+
+                if game_state.debug_mode {
+                    for &(wx, wy) in &current_map.walls { // Still using self.map.walls, need to adjust
+                        let wall_x_on_screen = wx.saturating_sub(game_state.camera_x as u32); // Use camera_x
+                        let wall_y_on_screen = wy.saturating_sub(game_state.camera_y as u32); // Use camera_y
+
+                        // Clamp wall drawing to buffer size
+                        if wall_x_on_screen < size.width as u32 && wall_y_on_screen < size.height as u32 {
+                            let draw_rect = ratatui::layout::Rect::new(
+                                wall_x_on_screen as u16,
+                                wall_y_on_screen as u16,
+                                1,
+                                1,
+                            );
+                            // Ensure draw_rect is within size
+                            let clamped_rect = draw_rect.intersection(size);
+                            if !clamped_rect.is_empty() {
+                                let wall_paragraph = Paragraph::new("W")
+                                    .style(Style::default().fg(Color::Red).bg(Color::Black));
+                                frame.render_widget(
+                                    wall_paragraph,
+                                    clamped_rect,
+                                );
+                            }
                         }
                     }
-                    processed_map_text.lines.push(Line::from(new_spans));
                 }
-
-                let map_paragraph = Paragraph::new(processed_map_text)
-                    .style(Style::default().fg(Color::White).bg(Color::Black))
-                    .scroll((game_state.camera_y, game_state.camera_x));
-                map_paragraph.render(size, &mut temp_buffer);
 
                 let (player_sprite_content, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
                 let player_paragraph = Paragraph::new(player_sprite_content);
-                player_paragraph.render(
-                    ratatui::layout::Rect::new(player_x_on_screen, player_y_on_screen, player_sprite_width, player_sprite_height),
-                    &mut temp_buffer,
-                );
 
-                let mut final_map_text = Text::default();
-                for y_coord in 0..size.height {
-                    let mut spans = Vec::new();
-                    for x_coord in 0..size.width {
-                        let cell = temp_buffer.cell(ratatui::layout::Position::new(x_coord, y_coord)).unwrap();
-                        spans.push(Span::styled(cell.symbol().to_string(), cell.style()));
-                    }
-                    final_map_text.lines.push(Line::from(spans));
-                }
-
-                let final_map_paragraph = Paragraph::new(final_map_text)
-                    .style(Style::default().fg(Color::White))
-                    .scroll((game_state.camera_y, game_state.camera_x));
-                frame.render_widget(final_map_paragraph, size);
-
-                let spawn_x_on_screen = game_state.spawn_x.saturating_sub(game_state.camera_x).saturating_sub(1);
-                let spawn_y_on_screen = game_state.spawn_y.saturating_sub(game_state.camera_y);
-
-                if spawn_x_on_screen < size.width && spawn_y_on_screen < size.height {
-                    let spawn_paragraph = Paragraph::new("S").style(Style::default().fg(Color::Green));
-                    frame.render_widget(spawn_paragraph, ratatui::layout::Rect::new(spawn_x_on_screen, spawn_y_on_screen, 1, 1));
-                }
-
-                let debug_text = format!(
-                    "Player: ({}, {}) Dir: {:?} Anim: {} Walking: {} Camera: ({}, {}) Map: ({}, {}) Screen: ({}, {}) NewCamY: {} MapH: {} FrameH: {}",
-                    game_state.player.x,
-                    game_state.player.y,
-                    game_state.player.direction,
-                    game_state.player.animation_frame,
-                    game_state.player.is_walking,
-                    game_state.camera_x,
-                    game_state.camera_y,
-                    game_state.map_width,
-                    game_state.map_height,
+                let player_draw_rect = ratatui::layout::Rect::new(
                     player_x_on_screen,
                     player_y_on_screen,
-                    game_state.camera_y,
-                    game_state.map_height,
-                    size.height
+                    player_sprite_width,
+                    player_sprite_height,
                 );
-                let debug_paragraph = Paragraph::new(debug_text)
-                    .block(Block::default().borders(Borders::ALL).title("Debug"))
-                    .style(Style::default().fg(Color::Cyan));
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Min(0), Constraint::Length(3)])
-                    .split(size);
-                frame.render_widget(debug_paragraph, chunks[1]);
+                // Ensure player_draw_rect is within size
+                let clamped_player_rect = player_draw_rect.intersection(size);
+                if !clamped_player_rect.is_empty() {
+                    frame.render_widget(
+                        player_paragraph,
+                        clamped_player_rect,
+                    );
+                }
+
+                
+
+                if game_state.show_debug_panel {
+                    let debug_text = vec![
+                        format!("Player: ({}, {})", game_state.player.x, game_state.player.y),
+                        format!("Direction: {:?}", game_state.player.direction),
+                        format!("Animation Frame: {}", game_state.player.animation_frame),
+                        format!("Walking: {}", game_state.player.is_walking),
+                        format!("Camera: ({}, {})", game_state.camera_x, game_state.camera_y),
+                        format!("Map: ({}, {})", current_map.width, current_map.height),
+                        format!("Screen Player Pos: ({}, {})", player_x_on_screen, player_y_on_screen),
+                        format!("Debug Mode: {}", game_state.debug_mode),
+                        format!("Current Map: {} ({}, {})", game_state.current_map_name, game_state.current_map_row, game_state.current_map_col),
+                    ];
+
+                    let debug_block = Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(ratatui::widgets::BorderType::Thick)
+                        .border_style(Style::default().fg(Color::White).bg(Color::White)) // Border color and background
+                        .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))) // Content color and background
+                        .padding(ratatui::widgets::Padding::new(1, 1, 1, 1)) // Add padding (left, right, top, bottom)
+                        .title("Debug Panel");
+
+                    let debug_paragraph = Paragraph::new(debug_text.join("\n"))
+                        .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))) // Explicitly set style for Paragraph content
+                        .block(debug_block);
+
+                    
+                    let max_line_length = debug_text.iter().map(|s| s.len() as u16).max().unwrap_or(0);
+                    let area = size; // Reintroduce area
+                    let debug_panel_width = max_line_length + 2 + 2; // +2 for borders, +2 for horizontal padding (1 left, 1 right)
+                    let debug_panel_height = debug_text.len() as u16 + 4; // +2 for borders, +2 for vertical padding
+
+                    let margin = 2; // Define margin value
+                    let x = area.width.saturating_sub(debug_panel_width + margin); // Right margin
+                    let y = margin; // Top margin
+
+                    let debug_panel_rect = ratatui::layout::Rect::new(x, y, debug_panel_width, debug_panel_height);
+                    frame.render_widget(Clear, debug_panel_rect); // Clear the area before drawing the panel
+
+                    frame.render_widget(debug_paragraph, debug_panel_rect);
+                }
 
                 if game_state.show_message {
                     let message_paragraph = Paragraph::new(game_state.message.clone())
@@ -182,7 +197,7 @@ fn run_app() -> io::Result<()> {
                             Constraint::Min(0),
                             Constraint::Length(3),
                         ])
-                        .split(size)[1]; // Render at the bottom
+                        .split(size)[1];
                     frame.render_widget(message_paragraph, message_area);
                 }
             })?;
