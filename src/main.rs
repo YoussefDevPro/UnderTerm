@@ -5,24 +5,25 @@ use std::{
     time::{Duration, Instant},
 };
 
+use ansi_to_tui::IntoText;
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use ratatui::prelude::Stylize; // Add this line
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Clear},
+    widgets::{Block, Borders, Clear, Paragraph},
     Terminal,
 };
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Source};
-use ansi_to_tui::IntoText; // Add this line
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Source}; // Add this line
 mod game_state;
+mod map;
 mod player;
 mod utils;
-mod map;
 
 use crate::game_state::GameState;
 
@@ -48,7 +49,6 @@ fn run_app() -> io::Result<()> {
     game_state.player.is_walking = false;
     game_state.player.animation_frame = 0;
     let mut last_frame_time = Instant::now();
-    let mut last_animation_update = Instant::now();
 
     let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
 
@@ -72,6 +72,14 @@ fn run_app() -> io::Result<()> {
                     }
                 } else if key.code == KeyCode::F(2) {
                     game_state.debug_mode = !game_state.debug_mode;
+                } else if key.code == KeyCode::Char('r') {
+                    if game_state.debug_mode {
+                        game_state.undo_wall_change();
+                    }
+                } else if key.code == KeyCode::Char('z') {
+                    if game_state.debug_mode {
+                        game_state.redo_wall_change();
+                    }
                 }
                 key_code = Some(key.code);
             }
@@ -86,19 +94,14 @@ fn run_app() -> io::Result<()> {
                     current_frame_size.width,
                     current_frame_size.height,
                 ),
+                ANIMATION_FRAME_DURATION,
             );
 
-            if game_state.player.is_walking
-                && last_animation_update.elapsed() >= ANIMATION_FRAME_DURATION
-            {
-                game_state.player.update_animation();
-                last_animation_update = Instant::now();
-            } else if !game_state.player.is_walking {
-                game_state.player.animation_frame = 0;
-            }
+            game_state.player.update_animation(ANIMATION_FRAME_DURATION); // Call update_animation unconditionally
 
             terminal.draw(|frame| {
                 let size = frame.area();
+                frame.render_widget(Block::default().bg(Color::Black), size); // Draw a solid black background block
 
                 let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
                 let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
@@ -107,19 +110,27 @@ fn run_app() -> io::Result<()> {
                 let combined_map_text = game_state.get_combined_map_text(size);
 
                 let map_paragraph = Paragraph::new(combined_map_text)
-                    .scroll((game_state.camera_y, game_state.camera_x)); // Use camera_y and camera_x
-                frame.render_widget(map_paragraph, size);
+                    .scroll((game_state.camera_y, game_state.camera_x)) // Use camera_y and camera_x
+                    .style(Style::default().bg(Color::Black)); // Ensure map background is black
+
+                // Create a block to ensure the entire area is covered by the map background
+                let map_block = Block::default().style(Style::default().bg(Color::Black));
+                frame.render_widget(map_block, size); // Draw the background block first
+                frame.render_widget(map_paragraph, size); // Then draw the map content on top
 
                 let current_map_key = (game_state.current_map_row, game_state.current_map_col);
                 let current_map = game_state.loaded_maps.get(&current_map_key).unwrap();
 
                 if game_state.debug_mode {
-                    for &(wx, wy) in &current_map.walls { // Still using self.map.walls, need to adjust
-                        let wall_x_on_screen = wx.saturating_sub(game_state.camera_x as u32); // Use camera_x
-                        let wall_y_on_screen = wy.saturating_sub(game_state.camera_y as u32); // Use camera_y
+                    for &(wx, wy) in &current_map.walls {
+                        // Still using self.map.walls, need to adjust
+                        let wall_x_on_screen = wx.saturating_sub(game_state.camera_x as u32); // Re-added camera_x subtraction
+                        let wall_y_on_screen = wy.saturating_sub(game_state.camera_y as u32); // Re-added camera_y subtraction
 
                         // Clamp wall drawing to buffer size
-                        if wall_x_on_screen < size.width as u32 && wall_y_on_screen < size.height as u32 {
+                        if wall_x_on_screen < size.width as u32
+                            && wall_y_on_screen < size.height as u32
+                        {
                             let draw_rect = ratatui::layout::Rect::new(
                                 wall_x_on_screen as u16,
                                 wall_y_on_screen as u16,
@@ -131,10 +142,7 @@ fn run_app() -> io::Result<()> {
                             if !clamped_rect.is_empty() {
                                 let wall_paragraph = Paragraph::new("W")
                                     .style(Style::default().fg(Color::Red).bg(Color::Black));
-                                frame.render_widget(
-                                    wall_paragraph,
-                                    clamped_rect,
-                                );
+                                frame.render_widget(wall_paragraph, clamped_rect);
                             }
                         }
                     }
@@ -146,7 +154,10 @@ fn run_app() -> io::Result<()> {
                     let spawn_x_on_screen = spawn_x.saturating_sub(game_state.camera_x as u32);
                     let spawn_y_on_screen = spawn_y.saturating_sub(game_state.camera_y as u32);
 
-                    if spawn_x_on_screen < size.width as u32 && spawn_y_on_screen < size.height as u32 {
+                    // Only draw if within screen bounds
+                    if spawn_x_on_screen < size.width as u32
+                        && spawn_y_on_screen < size.height as u32
+                    {
                         let draw_rect = ratatui::layout::Rect::new(
                             spawn_x_on_screen as u16,
                             spawn_y_on_screen as u16,
@@ -157,19 +168,18 @@ fn run_app() -> io::Result<()> {
                         if !clamped_rect.is_empty() {
                             let spawn_paragraph = Paragraph::new("S")
                                 .style(Style::default().fg(Color::Green).bg(Color::Black));
-                            frame.render_widget(
-                                spawn_paragraph,
-                                clamped_rect,
-                            );
+                            frame.render_widget(spawn_paragraph, clamped_rect);
                         }
                     }
                 }
 
-                let (player_sprite_content, player_sprite_width, player_sprite_height) = if game_state.debug_mode {
-                    ("P".to_string().as_bytes().into_text().unwrap(), 1u16, 1u16) // 'P' is 1x1
-                } else {
-                    game_state.player.get_sprite_content()
-                };
+                let (player_sprite_content, player_sprite_width, player_sprite_height) =
+                    if game_state.debug_mode {
+                        ("P".to_string().as_bytes().into_text().unwrap(), 1u16, 1u16)
+                    // 'P' is 1x1
+                    } else {
+                        game_state.player.get_sprite_content()
+                    };
                 let player_paragraph = Paragraph::new(player_sprite_content);
 
                 let player_draw_rect = ratatui::layout::Rect::new(
@@ -181,25 +191,29 @@ fn run_app() -> io::Result<()> {
                 // Ensure player_draw_rect is within size
                 let clamped_player_rect = player_draw_rect.intersection(size);
                 if !clamped_player_rect.is_empty() {
-                    frame.render_widget(
-                        player_paragraph,
-                        clamped_player_rect,
-                    );
+                    frame.render_widget(player_paragraph, clamped_player_rect);
                 }
-
-                
 
                 if game_state.show_debug_panel {
                     let debug_text = vec![
                         format!("Player: ({}, {})", game_state.player.x, game_state.player.y),
                         format!("Direction: {:?}", game_state.player.direction),
                         format!("Animation Frame: {}", game_state.player.animation_frame),
-                        format!("Walking: {}", game_state.player.is_walking),
+                        format!("Is Walking: {}", game_state.player.is_walking),
                         format!("Camera: ({}, {})", game_state.camera_x, game_state.camera_y),
                         format!("Map: ({}, {})", current_map.width, current_map.height),
-                        format!("Screen Player Pos: ({}, {})", player_x_on_screen, player_y_on_screen),
+                        format!(
+                            "Screen Player Pos: ({}, {})",
+                            player_x_on_screen, player_y_on_screen
+                        ),
                         format!("Debug Mode: {}", game_state.debug_mode),
-                        format!("Current Map: {} ({}, {})", game_state.current_map_name, game_state.current_map_row, game_state.current_map_col),
+                        format!(
+                            "Current Map: {} ({}, {})",
+                            game_state.current_map_name,
+                            game_state.current_map_row,
+                            game_state.current_map_col
+                        ),
+                        format!("Anim Frame Duration: {:?}", ANIMATION_FRAME_DURATION),
                     ];
 
                     let debug_block = Block::default()
@@ -214,8 +228,8 @@ fn run_app() -> io::Result<()> {
                         .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))) // Explicitly set style for Paragraph content
                         .block(debug_block);
 
-                    
-                    let max_line_length = debug_text.iter().map(|s| s.len() as u16).max().unwrap_or(0);
+                    let max_line_length =
+                        debug_text.iter().map(|s| s.len() as u16).max().unwrap_or(0);
                     let area = size; // Reintroduce area
                     let debug_panel_width = max_line_length + 2 + 2; // +2 for borders, +2 for horizontal padding (1 left, 1 right)
                     let debug_panel_height = debug_text.len() as u16 + 4; // +2 for borders, +2 for vertical padding
@@ -224,7 +238,8 @@ fn run_app() -> io::Result<()> {
                     let x = area.width.saturating_sub(debug_panel_width + margin); // Right margin
                     let y = margin; // Top margin
 
-                    let debug_panel_rect = ratatui::layout::Rect::new(x, y, debug_panel_width, debug_panel_height);
+                    let debug_panel_rect =
+                        ratatui::layout::Rect::new(x, y, debug_panel_width, debug_panel_height);
                     frame.render_widget(Clear, debug_panel_rect); // Clear the area before drawing the panel
 
                     frame.render_widget(debug_paragraph, debug_panel_rect);
@@ -236,10 +251,7 @@ fn run_app() -> io::Result<()> {
                         .style(Style::default().fg(Color::Yellow).bg(Color::Black));
                     let message_area = Layout::default()
                         .direction(Direction::Vertical)
-                        .constraints([
-                            Constraint::Min(0),
-                            Constraint::Length(3),
-                        ])
+                        .constraints([Constraint::Min(0), Constraint::Length(3)])
                         .split(size)[1];
                     frame.render_widget(message_paragraph, message_area);
                 }

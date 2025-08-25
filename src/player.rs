@@ -1,7 +1,13 @@
 use ansi_to_tui::IntoText;
 
-use ratatui::{ text::Text, };
+use ratatui::text::Text;
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant}; // Add this line
+
+// Helper function for serde default
+fn default_instant() -> Instant {
+    Instant::now()
+}
 
 // Enum to represent player direction
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
@@ -20,6 +26,8 @@ pub struct Player {
     pub direction: PlayerDirection,
     pub animation_frame: u8,
     pub is_walking: bool,
+    #[serde(skip, default = "default_instant")]
+    pub animation_timer: Instant,
 }
 
 impl Player {
@@ -30,6 +38,7 @@ impl Player {
             direction: PlayerDirection::Front, // Default direction
             animation_frame: 0,
             is_walking: false,
+            animation_timer: Instant::now(), // Initialize timer
         }
     }
 
@@ -55,55 +64,71 @@ impl Player {
             PlayerDirection::Front => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("walk", "frisk_walk_front_1.ans"),
-                        1 => ("walk", "frisk_walk_front_2.ans"),
+                        0 => ("idle", "frisk_idle_front.ans"),
+                        1 => ("walk", "frisk_walk_front_1.ans"),
+                        2 => ("idle", "frisk_idle_front.ans"),
+                        3 => ("walk", "frisk_walk_front_2.ans"),
                         _ => ("idle", "frisk_idle_front.ans"), // Fallback
                     }
                 } else {
                     ("idle", "frisk_idle_front.ans")
                 }
-            },
+            }
             PlayerDirection::Back => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("walk", "frisk_walk_back_1.ans"),
-                        1 => ("walk", "frisk_walk_back_2.ans"),
+                        0 => ("idle", "frisk_idle_back.ans"),
+                        1 => ("walk", "frisk_walk_back_1.ans"),
+                        2 => ("idle", "frisk_idle_back.ans"),
+                        3 => ("walk", "frisk_walk_back_2.ans"),
                         _ => ("idle", "frisk_idle_back.ans"), // Fallback
                     }
                 } else {
                     ("idle", "frisk_idle_back.ans")
                 }
-            },
+            }
             PlayerDirection::Left => {
                 if self.is_walking {
-                    ("walk", "frisk_walk_left.ans")
+                    match self.animation_frame {
+                        0 => ("idle", "frisk_idle_left.ans"),
+                        1 => ("walk", "frisk_walk_left.ans"),
+                        _ => ("idle", "frisk_idle_left.ans"), // Fallback
+                    }
                 } else {
                     ("idle", "frisk_idle_left.ans")
                 }
-            },
+            }
             PlayerDirection::Right => {
                 if self.is_walking {
-                    ("walk", "frisk_walk_right.ans")
+                    match self.animation_frame {
+                        0 => ("idle", "frisk_idle_right.ans"),
+                        1 => ("walk", "frisk_walk_right.ans"),
+                        _ => ("idle", "frisk_idle_right.ans"), // Fallback
+                    }
                 } else {
                     ("idle", "frisk_idle_right.ans")
                 }
-            },
+            }
         };
         format!("{}{}/{}", base_path, sub_dir, anim_file)
     }
 
-    pub fn update_animation(&mut self) {
+    pub fn update_animation(&mut self, animation_frame_duration: Duration) {
         if self.is_walking {
-            match self.direction {
-                PlayerDirection::Front | PlayerDirection::Back => {
-                    self.animation_frame = (self.animation_frame + 1) % 3; // 0, 1, 2
+            if self.animation_timer.elapsed() >= animation_frame_duration {
+                match self.direction {
+                    PlayerDirection::Front | PlayerDirection::Back => {
+                        self.animation_frame = (self.animation_frame + 1) % 4; // 0, 1, 2, 3
+                    }
+                    PlayerDirection::Left | PlayerDirection::Right => {
+                        self.animation_frame = (self.animation_frame + 1) % 2; // 0, 1
+                    }
                 }
-                PlayerDirection::Left | PlayerDirection::Right => {
-                    self.animation_frame = (self.animation_frame + 1) % 2; // 0, 1
-                }
+                self.animation_timer = Instant::now(); // Reset timer
             }
         } else {
-            self.animation_frame = 0; // seret
+            self.animation_frame = 0; // reset
+            self.animation_timer = Instant::now(); // Reset timer when idle
         }
     }
 }

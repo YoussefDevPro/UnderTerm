@@ -24,6 +24,10 @@ pub struct GameState {
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
+    #[serde(skip)]
+    pub wall_history: Vec<Vec<(u32, u32)>>,
+    #[serde(skip)]
+    pub history_index: usize,
 }
 
 impl GameState {
@@ -37,7 +41,7 @@ impl GameState {
         let current_map_col: i32 = map_parts[2].parse().unwrap_or(0);
 
         let mut loaded_maps = HashMap::new();
-        loaded_maps.insert((current_map_row, current_map_col), map);
+        loaded_maps.insert((current_map_row, current_map_col), map.clone()); // Clone map here
 
         GameState {
             player: Player::new(player_spawn_x as u16, player_spawn_y as u16),
@@ -52,6 +56,8 @@ impl GameState {
             sound_error: None, // Initialize sound_error
             current_map_row,
             current_map_col,
+            wall_history: vec![map.walls.clone()], // Initialize with current map walls
+            history_index: 0,
         }
     }
 
@@ -88,13 +94,14 @@ impl GameState {
         }
     }
 
-    pub fn update(&mut self, key_code: Option<KeyCode>, frame_size: ratatui::layout::Rect) {
-        self.player.is_walking = false;
+    pub fn update(&mut self, key_code: Option<KeyCode>, frame_size: ratatui::layout::Rect, animation_frame_duration: std::time::Duration) {
         self.show_message = false;
 
         // Get the current map from loaded_maps
         let current_map_key = (self.current_map_row, self.current_map_col);
         let current_map = self.loaded_maps.get(&current_map_key).cloned().unwrap(); // Get the current map
+
+        let mut moved_this_frame = false; // Moved declaration here
 
         if let Some(key) = key_code {
             let mut new_player_x = self.player.x;
@@ -104,22 +111,22 @@ impl GameState {
                 KeyCode::Up => {
                     new_player_y = new_player_y.saturating_sub(PLAYER_SPEED);
                     self.player.direction = PlayerDirection::Back;
-                    self.player.is_walking = true;
+                    moved_this_frame = true;
                 }
                 KeyCode::Down => {
                     new_player_y = new_player_y.saturating_add(PLAYER_SPEED);
                     self.player.direction = PlayerDirection::Front;
-                    self.player.is_walking = true;
+                    moved_this_frame = true;
                 }
                 KeyCode::Left => {
                     new_player_x = new_player_x.saturating_sub(PLAYER_HORIZONTAL_SPEED);
                     self.player.direction = PlayerDirection::Left;
-                    self.player.is_walking = true;
+                    moved_this_frame = true;
                 }
                 KeyCode::Right => {
                     new_player_x = new_player_x.saturating_add(PLAYER_HORIZONTAL_SPEED);
                     self.player.direction = PlayerDirection::Right;
-                    self.player.is_walking = true;
+                    moved_this_frame = true;
                 }
                 
                 KeyCode::Enter => {
@@ -127,13 +134,23 @@ impl GameState {
                         let current_map_key = (self.current_map_row, self.current_map_col);
                         if let Some(map_to_modify) = self.loaded_maps.get_mut(&current_map_key) {
                             map_to_modify.toggle_wall(self.player.x as u32, self.player.y as u32);
-                            self.message = format!("Toggled wall at ({}, {})", self.player.x, self.player.y);
-                            self.show_message = true;
+                            if let Err(e) = map_to_modify.save_data() {
+                                self.message = format!("Failed to save map data: {}", e);
+                                self.show_message = true;
+                            } else {
+                                self.message = format!("Toggled wall at ({}, {}) and saved.", self.player.x, self.player.y);
+                                self.show_message = true;
+                            }
+                            // Update history
+                            self.wall_history.truncate(self.history_index + 1);
+                            self.wall_history.push(map_to_modify.walls.clone());
+                            self.history_index = self.wall_history.len() - 1;
                         }
                     }
                 }
                 _ => {}
             }
+            self.player.is_walking = moved_this_frame; // Set is_walking based on movement
 
             // --- Map Transition Logic ---
             let mut transitioned = false;
@@ -237,16 +254,16 @@ impl GameState {
                 } else {
                     // Clamp player position to map boundaries, considering sprite size
                     self.player.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
-                    self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height).saturating_sub(1));
+                    self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height));
                 }
             } else {
                 // In debug mode, allow walking through walls
                 self.player.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
-                self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height).saturating_sub(1));
+                self.player.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height));
             }
         }
 
-        self.player.update_animation();
+        self.player.update_animation(animation_frame_duration);
 
         // Re-implement continuous camera logic
         // Calculate the desired camera position to center the player
@@ -278,6 +295,46 @@ impl GameState {
             map_chunk.ansi_sprite.as_bytes().into_text().unwrap_or_default()
         } else {
             Text::default()
+        }
+    }
+
+    pub fn undo_wall_change(&mut self) {
+        if self.history_index > 0 {
+            self.history_index -= 1;
+            let current_map_key = (self.current_map_row, self.current_map_col);
+            if let Some(map_to_modify) = self.loaded_maps.get_mut(&current_map_key) {
+                map_to_modify.walls = self.wall_history[self.history_index].clone();
+                if let Err(e) = map_to_modify.save_data() {
+                    self.message = format!("Failed to save map data after undo: {}", e);
+                    self.show_message = true;
+                } else {
+                    self.message = "Undid last wall change.".to_string();
+                    self.show_message = true;
+                }
+            }
+        } else {
+            self.message = "No more changes to undo.".to_string();
+            self.show_message = true;
+        }
+    }
+
+    pub fn redo_wall_change(&mut self) {
+        if self.history_index < self.wall_history.len() - 1 {
+            self.history_index += 1;
+            let current_map_key = (self.current_map_row, self.current_map_col);
+            if let Some(map_to_modify) = self.loaded_maps.get_mut(&current_map_key) {
+                map_to_modify.walls = self.wall_history[self.history_index].clone();
+                if let Err(e) = map_to_modify.save_data() {
+                    self.message = format!("Failed to save map data after redo: {}", e);
+                    self.show_message = true;
+                } else {
+                    self.message = "Redid last wall change.".to_string();
+                    self.show_message = true;
+                }
+            }
+        } else {
+            self.message = "No more changes to redo.".to_string();
+            self.show_message = true;
         }
     }
 }

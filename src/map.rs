@@ -75,4 +75,19 @@ impl Map {
             self.walls.push(pos);
         }
     }
+
+    pub fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(&self.name);
+        let data_path = base_path.join("data.json");
+
+        let map_data = MapData {
+            map_name: self.name.clone(),
+            player_spawn: self.player_spawn,
+            walls: self.walls.clone(),
+        };
+
+        let serialized = serde_json::to_string_pretty(&map_data)?;
+        fs::write(&data_path, serialized)?;
+        Ok(())
+    }
 }
