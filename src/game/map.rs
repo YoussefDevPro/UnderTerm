@@ -2,11 +2,50 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub enum MapKind {
+    #[serde(rename = "walls")]
+    Walls,
+    #[serde(rename = "objects")]
+    Objects,
+    #[serde(rename = "empty")]
+    Empty,
+    // Add more kinds as needed
+}
+
+impl Default for MapKind {
+    fn default() -> Self {
+        MapKind::Walls // Default to Walls if not specified
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MapData {
     pub map_name: String,
     pub player_spawn: (u32, u32),
     pub walls: Vec<(u32, u32)>,
+    #[serde(default)]
+    pub select_object_boxes: Vec<SelectObjectBox>,
+    #[serde(default)] // Use default if kind is not specified in JSON
+    pub kind: MapKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Event {
+    TeleportPlayer { x: u32, y: u32, map_row: i32, map_col: i32 },
+    // Add more event types as needed
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectObjectBox {
+    pub id: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub messages: Vec<String>,
+    #[serde(default)] // Use default if events are not specified
+    pub events: Vec<Event>, // Added
 }
 
 use ansi_to_tui::IntoText;
@@ -17,6 +56,8 @@ pub struct Map {
     pub ansi_sprite: String,
     pub walls: Vec<(u32, u32)>,
     pub player_spawn: (u32, u32),
+    pub select_object_boxes: Vec<SelectObjectBox>, // Added
+    pub kind: MapKind, // Added
     pub width: u16,
     pub height: u16,
 }
@@ -60,6 +101,8 @@ impl Map {
             ansi_sprite,
             walls: map_data.walls,
             player_spawn: map_data.player_spawn,
+            select_object_boxes: map_data.select_object_boxes,
+            kind: map_data.kind, // Add this line
             width,
             height,
         })
@@ -84,10 +127,16 @@ impl Map {
             map_name: self.name.clone(),
             player_spawn: self.player_spawn,
             walls: self.walls.clone(),
+            select_object_boxes: self.select_object_boxes.clone(), // Added
+            kind: self.kind.clone(), // Add this line
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
         fs::write(&data_path, serialized)?;
         Ok(())
+    }
+
+    pub fn add_select_object_box(&mut self, select_object_box: SelectObjectBox) {
+        self.select_object_boxes.push(select_object_box);
     }
 }

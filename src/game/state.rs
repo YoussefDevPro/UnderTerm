@@ -36,6 +36,16 @@ pub struct GameState {
     #[serde(skip)]
     pub loaded_maps: std::collections::HashMap<(i32, i32), Map>,
     pub debug_mode: bool,
+    pub show_collision_box: bool, // Added
+    pub current_interaction_box_id: Option<u32>, // Added
+    pub current_message_index: usize, // Added
+    pub is_drawing_select_box: bool, // Added
+    pub select_box_start_coords: Option<(u16, u16)>, // Added
+    pub is_text_input_active: bool, // Added
+    pub text_input_buffer: String, // Added
+    pub pending_select_box: Option<crate::game::map::SelectObjectBox>, // Added
+    pub is_event_input_active: bool, // Added
+    pub is_map_kind_selection_active: bool, // Added
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -72,6 +82,16 @@ impl GameState {
             loaded_maps,
             debug_mode: false,
             show_debug_panel: false, // Added this line
+            show_collision_box: false, // Initialize
+            current_interaction_box_id: None, // Initialize
+            current_message_index: 0, // Initialize
+            is_drawing_select_box: false, // Initialize
+            select_box_start_coords: None, // Initialize
+            is_text_input_active: false, // Initialize
+            text_input_buffer: String::new(), // Initialize
+            pending_select_box: None, // Initialize
+            is_event_input_active: false, // Initialize
+            is_map_kind_selection_active: false, // Initialize
             sound_error: None, // Initialize sound_error
             current_map_row,
             current_map_col,
@@ -109,7 +129,7 @@ impl GameState {
         }
     }
 
-    pub fn update(&mut self, key_codes: Vec<KeyCode>, frame_size: ratatui::layout::Rect, animation_frame_duration: std::time::Duration) {
+    pub fn update(&mut self, key_states: &HashMap<KeyCode, bool>, frame_size: ratatui::layout::Rect, animation_frame_duration: std::time::Duration) {
         // Update animated message content
         if self.show_message {
             let elapsed = self.message_animation_start_time.elapsed();
@@ -124,10 +144,6 @@ impl GameState {
             self.message_animation_finished = true;
         } else {
             self.message_animation_finished = false;
-            // If animation is not finished, ensure message is shown
-            if !self.message.is_empty() {
-                self.show_message = true;
-            }
         }
 
         let mut context = PlayerUpdateContext {
@@ -146,7 +162,7 @@ impl GameState {
 
         // Prevent player movement if a message is being displayed
         if !*context.show_message {
-            self.player.update(&mut context, key_codes, animation_frame_duration);
+            self.player.update(&mut context, key_states, animation_frame_duration);
         }
 
         // Re-implement continuous camera logic

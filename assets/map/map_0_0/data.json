@@ -4160,6 +4160,73 @@
     [
       432,
       52
+    ],
+    [
+      90,
+      11
     ]
-  ]
+  ],
+  "select_object_boxes": [
+    {
+      "id": 1,
+      "x": 81,
+      "y": 40,
+      "width": 36,
+      "height": 12,
+      "messages": [
+        "its just flowers...",
+        "why are u caring about those flowers ??..."
+      ],
+      "events": []
+    },
+    {
+      "id": 2,
+      "x": 14,
+      "y": 30,
+      "width": 3,
+      "height": 26,
+      "messages": [
+        "its a wall"
+      ],
+      "events": []
+    },
+    {
+      "id": 3,
+      "x": 51,
+      "y": 21,
+      "width": 89,
+      "height": 2,
+      "messages": [
+        "...",
+        "there is nothing..."
+      ],
+      "events": []
+    },
+    {
+      "id": 4,
+      "x": 54,
+      "y": 77,
+      "width": 90,
+      "height": 2,
+      "messages": [
+        "...",
+        "still nothing...",
+        "just go ahead, something, very very interesting is waiting u in this door =)"
+      ],
+      "events": []
+    },
+    {
+      "id": 5,
+      "x": 262,
+      "y": 53,
+      "width": 60,
+      "height": 2,
+      "messages": [
+        "u see an obscure figure...",
+        "its watching us..."
+      ],
+      "events": []
+    }
+  ],
+  "kind": "walls"
 }
