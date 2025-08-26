@@ -19,18 +19,12 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Terminal,
 };
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Source}; // Add this line
-mod game_state;
-mod map;
-mod player;
-mod utils;
 
-use crate::game_state::GameState;
+mod audio;
+mod game;
 
-const PLAYER_SPEED: u16 = 1;
-const PLAYER_HORIZONTAL_SPEED: u16 = 2;
-const FRAME_RATE: u64 = 120;
-const ANIMATION_FRAME_DURATION: Duration = Duration::from_millis(200);
+use crate::game::config::{ANIMATION_FRAME_DURATION, FRAME_RATE};
+use crate::game::state::GameState;
 
 fn run_app() -> io::Result<()> {
     enable_raw_mode()?;
@@ -50,44 +44,61 @@ fn run_app() -> io::Result<()> {
     game_state.player.animation_frame = 0;
     let mut last_frame_time = Instant::now();
 
-    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+    let audio = crate::audio::Audio::new().unwrap();
 
     loop {
         let elapsed_time = last_frame_time.elapsed();
         if elapsed_time >= Duration::from_millis(1000 / FRAME_RATE) {
             last_frame_time = Instant::now();
 
-            let mut key_code = None;
+            let mut key_codes = Vec::new();
             while let Ok(Event::Key(key)) = rx.try_recv() {
-                if key.code == KeyCode::Char('q') {
-                    game_state.save_game_state()?;
-                    return Ok(());
-                } else if key.code == KeyCode::F(1) {
-                    game_state.show_debug_panel = !game_state.show_debug_panel;
-                    if game_state.show_debug_panel {
-                        // Play sound
-                        let file = std::fs::File::open("assets/sound/open_settings.mp3").unwrap();
-                        let decoder = rodio::Decoder::new(std::io::BufReader::new(file)).unwrap();
-                        stream_handle.play_raw(decoder.convert_samples()).unwrap();
+                if game_state.show_message {
+                    // If message is active, handle message-related input
+                    if key.code == KeyCode::Enter {
+                        game_state.dismiss_message();
+                    } else if key.code == KeyCode::Char(' ') {
+                        // Spacebar to skip animation
+                        game_state.skip_message_animation();
                     }
-                } else if key.code == KeyCode::F(2) {
-                    game_state.debug_mode = !game_state.debug_mode;
-                } else if key.code == KeyCode::Char('r') {
-                    if game_state.debug_mode {
-                        game_state.undo_wall_change();
-                    }
-                } else if key.code == KeyCode::Char('z') {
-                    if game_state.debug_mode {
-                        game_state.redo_wall_change();
+                } else {
+                    // Otherwise, handle normal game input
+                    if key.code == KeyCode::Char('q') {
+                        game_state.save_game_state()?;
+                        return Ok(());
+                    } else if key.code == KeyCode::F(1) {
+                        game_state.show_debug_panel = !game_state.show_debug_panel;
+                        if game_state.show_debug_panel {
+                            audio.play_open_settings_sound();
+                        }
+                    } else if key.code == KeyCode::F(2) {
+                        game_state.debug_mode = !game_state.debug_mode;
+                    } else if key.code == KeyCode::Char('r') {
+                        if game_state.debug_mode {
+                            game_state.undo_wall_change();
+                        }
+                    } else if key.code == KeyCode::Char('z') {
+                        if game_state.debug_mode {
+                            game_state.redo_wall_change();
+                        }
+                    } else if key.code == KeyCode::Char('s') {
+                        // Added 's' key handling
+                        if game_state.debug_mode {
+                            game_state.set_player_spawn_to_current_position(
+                                game_state.player.x,
+                                game_state.player.y,
+                            );
+                        }
+                    } else {
+                        key_codes.push(key.code);
                     }
                 }
-                key_code = Some(key.code);
             }
 
             let current_frame_size = terminal.size()?;
 
             game_state.update(
-                key_code,
+                key_codes,
                 ratatui::layout::Rect::new(
                     0,
                     0,
@@ -96,8 +107,6 @@ fn run_app() -> io::Result<()> {
                 ),
                 ANIMATION_FRAME_DURATION,
             );
-
-            game_state.player.update_animation(ANIMATION_FRAME_DURATION); // Call update_animation unconditionally
 
             terminal.draw(|frame| {
                 let size = frame.area();
@@ -148,24 +157,20 @@ fn run_app() -> io::Result<()> {
                     }
 
                     // Draw spawn point 'S'
-                    let spawn_x = current_map.player_spawn.0;
-                    let spawn_y = current_map.player_spawn.1;
+                    let spawn_x = game_state.player.x; // Use player's current x
+                    let spawn_y = game_state.player.y; // Use player's current y
 
-                    let spawn_x_on_screen = spawn_x.saturating_sub(game_state.camera_x as u32);
-                    let spawn_y_on_screen = spawn_y.saturating_sub(game_state.camera_y as u32);
+                    let spawn_x_on_screen = spawn_x.saturating_sub(game_state.camera_x);
+                    let spawn_y_on_screen = spawn_y.saturating_sub(game_state.camera_y);
 
-                    // Only draw if within screen bounds
-                    if spawn_x_on_screen < size.width as u32
-                        && spawn_y_on_screen < size.height as u32
+                    // Only draw if within screen bounds (or always in debug mode)
+                    if game_state.debug_mode
+                        || (spawn_x_on_screen < size.width && spawn_y_on_screen < size.height)
                     {
-                        let draw_rect = ratatui::layout::Rect::new(
-                            spawn_x_on_screen as u16,
-                            spawn_y_on_screen as u16,
-                            1,
-                            1,
-                        );
+                        let draw_rect =
+                            ratatui::layout::Rect::new(spawn_x_on_screen, spawn_y_on_screen, 1, 1);
                         let clamped_rect = draw_rect.intersection(size);
-                        if !clamped_rect.is_empty() {
+                        if game_state.debug_mode || !clamped_rect.is_empty() {
                             let spawn_paragraph = Paragraph::new("S")
                                 .style(Style::default().fg(Color::Green).bg(Color::Black));
                             frame.render_widget(spawn_paragraph, clamped_rect);
@@ -180,7 +185,12 @@ fn run_app() -> io::Result<()> {
                     } else {
                         game_state.player.get_sprite_content()
                     };
-                let player_paragraph = Paragraph::new(player_sprite_content);
+                let player_paragraph = if game_state.debug_mode {
+                    Paragraph::new(player_sprite_content).style(Style::default().bg(Color::Blue))
+                // Add blue background in debug mode
+                } else {
+                    Paragraph::new(player_sprite_content)
+                };
 
                 let player_draw_rect = ratatui::layout::Rect::new(
                     player_x_on_screen,
@@ -190,7 +200,7 @@ fn run_app() -> io::Result<()> {
                 );
                 // Ensure player_draw_rect is within size
                 let clamped_player_rect = player_draw_rect.intersection(size);
-                if !clamped_player_rect.is_empty() {
+                if game_state.debug_mode || !clamped_player_rect.is_empty() {
                     frame.render_widget(player_paragraph, clamped_player_rect);
                 }
 
@@ -246,13 +256,42 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.show_message {
-                    let message_paragraph = Paragraph::new(game_state.message.clone())
-                        .block(Block::default().borders(Borders::ALL).title("Message"))
-                        .style(Style::default().fg(Color::Yellow).bg(Color::Black));
+                    let message_block = Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(ratatui::widgets::BorderType::Thick)
+                        .border_style(Style::default().fg(Color::White).bg(Color::White))
+                        .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+                        .padding(ratatui::widgets::Padding::new(8, 8, 1, 1)) // 8 left/right padding
+                        .title("Message");
+
+                    let message_paragraph =
+                        Paragraph::new(game_state.animated_message_content.clone())
+                            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+                            .block(message_block);
+
+                    let message_height = 10; // Set message box height to 10 lines
+                    let bottom_margin = 5; // 5 lines bottom margin
+                    let horizontal_margin = 40; // 15 lines horizontal margin (increased for smaller width)
+
                     let message_area = Layout::default()
                         .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(0), Constraint::Length(3)])
+                        .constraints([
+                            Constraint::Min(0),
+                            Constraint::Length(message_height),
+                            Constraint::Length(bottom_margin),
+                        ])
                         .split(size)[1];
+
+                    let message_area = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints([
+                            Constraint::Length(horizontal_margin),
+                            Constraint::Min(0),
+                            Constraint::Length(horizontal_margin),
+                        ])
+                        .split(message_area)[1];
+
+                    frame.render_widget(Clear, message_area); // Clear the area before drawing the panel
                     frame.render_widget(message_paragraph, message_area);
                 }
             })?;
