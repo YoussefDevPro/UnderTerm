@@ -53,6 +53,7 @@ pub struct GameState {
     pub wall_history: Vec<Vec<(u32, u32)>>,
     #[serde(skip)]
     pub history_index: usize,
+    pub is_creating_map: bool,
 }
 
 impl GameState {
@@ -97,6 +98,7 @@ impl GameState {
             current_map_col,
             wall_history: vec![map.walls.clone()], // Initialize with current map walls
             history_index: 0,
+            is_creating_map: false,
         }
     }
 

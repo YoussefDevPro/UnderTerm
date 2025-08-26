@@ -4226,6 +4226,26 @@
         "its watching us..."
       ],
       "events": []
+    },
+    {
+      "id": 6,
+      "x": 15,
+      "y": 15,
+      "width": 5,
+      "height": 5,
+      "messages": [
+        "You feel a strange energy coming from this spot..."
+      ],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 10,
+            "y": 10,
+            "map_row": 0,
+            "map_col": 1
+          }
+        }
+      ]
     }
   ],
   "kind": "walls"

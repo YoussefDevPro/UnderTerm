@@ -139,4 +139,38 @@ impl Map {
     pub fn add_select_object_box(&mut self, select_object_box: SelectObjectBox) {
         self.select_object_boxes.push(select_object_box);
     }
+
+    pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(map_name);
+        fs::create_dir_all(&base_path)?;
+
+        let data_path = base_path.join("data.json");
+        let sprite_path = base_path.join("sprite.ans");
+
+        // Create a default map data
+        let map_data = MapData {
+            map_name: map_name.to_string(),
+            player_spawn: (10, 10), // Default spawn point
+            walls: vec![],
+            select_object_boxes: vec![],
+            kind: MapKind::Empty,
+        };
+
+        let serialized = serde_json::to_string_pretty(&map_data)?;
+        fs::write(&data_path, serialized)?;
+
+        // Create an empty sprite file
+        fs::write(&sprite_path, "")?;
+
+        Ok(Map {
+            name: map_name.to_string(),
+            ansi_sprite: "".to_string(),
+            walls: vec![],
+            player_spawn: (10, 10),
+            select_object_boxes: vec![],
+            kind: MapKind::Empty,
+            width: 0,
+            height: 0,
+        })
+    }
 }

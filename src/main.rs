@@ -40,10 +40,10 @@ use crate::game::config::{ANIMATION_FRAME_DURATION, FRAME_RATE};
 use crate::game::state::GameState;
 
 fn run_app() -> io::Result<()> {
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    enable_raw_mode()?;
 
+    stdout().execute(EnterAlternateScreen)?;
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
@@ -79,21 +79,56 @@ fn run_app() -> io::Result<()> {
                                     game_state.text_input_buffer.pop();
                                 }
                                 KeyCode::Enter => {
-                                    // When Enter is pressed, the current text in the buffer is added as a message.
-                                    // It is not immediately displayed on the map, but stored for the SelectObjectBox.
-                                    if let Some(ref mut pending_box) = game_state.pending_select_box
-                                    {
-                                        pending_box
-                                            .messages
-                                            .push(game_state.text_input_buffer.clone());
+                                    if game_state.is_creating_map {
+                                        let map_name =
+                                            game_state.text_input_buffer.trim().to_string();
+                                        if !map_name.is_empty() {
+                                            match crate::game::map::Map::create_new(&map_name) {
+                                                Ok(new_map) => {
+                                                    let map_parts: Vec<&str> =
+                                                        new_map.name.split('_').collect();
+                                                    let new_map_row: i32 =
+                                                        map_parts[1].parse().unwrap_or(0);
+                                                    let new_map_col: i32 =
+                                                        map_parts[2].parse().unwrap_or(0);
+                                                    game_state.loaded_maps.insert(
+                                                        (new_map_row, new_map_col),
+                                                        new_map,
+                                                    );
+                                                    game_state.message =
+                                                        format!("Created new map: {}", map_name);
+                                                }
+                                                Err(e) => {
+                                                    game_state.message =
+                                                        format!("Error creating map: {}", e);
+                                                }
+                                            }
+                                        }
+                                        game_state.is_creating_map = false;
+                                        game_state.is_text_input_active = false;
                                         game_state.text_input_buffer.clear();
-                                        game_state.message = format!(
-                                            "Message added. Enter next or Esc to finish. Current messages: {}",
-                                            pending_box.messages.len()
-                                        );
                                         game_state.show_message = true;
                                         game_state.message_animation_start_time = Instant::now();
                                         game_state.animated_message_content.clear();
+                                    } else {
+                                        // When Enter is pressed, the current text in the buffer is added as a message.
+                                        // It is not immediately displayed on the map, but stored for the SelectObjectBox.
+                                        if let Some(ref mut pending_box) =
+                                            game_state.pending_select_box
+                                        {
+                                            pending_box
+                                                .messages
+                                                .push(game_state.text_input_buffer.clone());
+                                            game_state.text_input_buffer.clear();
+                                            game_state.message = format!(
+                                                "Message added. Enter next or Esc to finish. Current messages: {}",
+                                                pending_box.messages.len()
+                                            );
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time =
+                                                Instant::now();
+                                            game_state.animated_message_content.clear();
+                                        }
                                     }
                                 }
                                 KeyCode::Esc => {
@@ -180,16 +215,16 @@ fn run_app() -> io::Result<()> {
                                         {
                                             map_to_modify.add_select_object_box(pending_box);
                                             if let Err(e) = map_to_modify.save_data() {
-                                                game_state.message = 
+                                                game_state.message =
                                                     format!("Failed to save map data: {}", e);
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time = 
+                                                game_state.message_animation_start_time =
                                                     Instant::now();
                                                 game_state.animated_message_content.clear();
                                             } else {
                                                 game_state.message = "SelectObjectBox created and saved with messages and events.".to_string();
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time = 
+                                                game_state.message_animation_start_time =
                                                     Instant::now();
                                                 game_state.animated_message_content.clear();
                                             }
@@ -411,7 +446,9 @@ fn run_app() -> io::Result<()> {
 
                                             let top_box = ratatui::layout::Rect::new(
                                                 collision_box.x,
-                                                collision_box.y.saturating_sub(TOP_INTERACTION_BOX_HEIGHT),
+                                                collision_box
+                                                    .y
+                                                    .saturating_sub(TOP_INTERACTION_BOX_HEIGHT),
                                                 collision_box.width,
                                                 TOP_INTERACTION_BOX_HEIGHT,
                                             );
@@ -422,7 +459,9 @@ fn run_app() -> io::Result<()> {
                                                 BOTTOM_INTERACTION_BOX_HEIGHT,
                                             );
                                             let left_box = ratatui::layout::Rect::new(
-                                                collision_box.x.saturating_sub(LEFT_INTERACTION_BOX_WIDTH),
+                                                collision_box
+                                                    .x
+                                                    .saturating_sub(LEFT_INTERACTION_BOX_WIDTH),
                                                 collision_box.y,
                                                 LEFT_INTERACTION_BOX_WIDTH,
                                                 collision_box.height,
@@ -433,7 +472,8 @@ fn run_app() -> io::Result<()> {
                                                 RIGHT_INTERACTION_BOX_WIDTH,
                                                 collision_box.height,
                                             );
-                                            let interaction_boxes = [top_box, bottom_box, left_box, right_box];
+                                            let interaction_boxes =
+                                                [top_box, bottom_box, left_box, right_box];
 
                                             let current_map_key = (
                                                 game_state.current_map_row,
@@ -443,7 +483,9 @@ fn run_app() -> io::Result<()> {
                                                 game_state.loaded_maps.get(&current_map_key)
                                             {
                                                 'outer: for interaction_box in &interaction_boxes {
-                                                    for select_box in &current_map.select_object_boxes {
+                                                    for select_box in
+                                                        &current_map.select_object_boxes
+                                                    {
                                                         let select_box_rect =
                                                             ratatui::layout::Rect::new(
                                                                 select_box.x as u16,
@@ -452,7 +494,9 @@ fn run_app() -> io::Result<()> {
                                                                 select_box.height as u16,
                                                             );
 
-                                                        if interaction_box.intersects(select_box_rect) {
+                                                        if interaction_box
+                                                            .intersects(select_box_rect)
+                                                        {
                                                             if !select_box.messages.is_empty() {
                                                                 game_state.message =
                                                                     select_box.messages[0].clone();
@@ -463,17 +507,18 @@ fn run_app() -> io::Result<()> {
                                                                 game_state
                                                                     .animated_message_content
                                                                     .clear();
-                                                                game_state.current_interaction_box_id =
+                                                                game_state
+                                                                    .current_interaction_box_id =
                                                                     Some(select_box.id);
-                                                                game_state.current_message_index = 0;
+                                                                game_state.current_message_index =
+                                                                    0;
                                                             }
                                                             break 'outer;
                                                         }
                                                     }
                                                 }
                                             }
-                                        }
-                                        if key.code == KeyCode::Char('q') {
+                                        } else if key.code == KeyCode::Char('q') {
                                             game_state.save_game_state()?;
                                             return Ok(());
                                         } else if key.code == KeyCode::F(1) {
@@ -484,11 +529,24 @@ fn run_app() -> io::Result<()> {
                                             }
                                         } else if key.code == KeyCode::F(2) {
                                             game_state.debug_mode = !game_state.debug_mode;
+                                        } else if key.code == KeyCode::F(3) {
+                                            if game_state.debug_mode {
+                                                game_state.is_creating_map = true;
+                                                game_state.is_text_input_active = true;
+                                                game_state.text_input_buffer.clear();
+                                                game_state.message =
+                                                    "Enter new map name (e.g., map_0_1):"
+                                                        .to_string();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time =
+                                                    Instant::now();
+                                                game_state.animated_message_content.clear();
+                                            }
                                         } else if key.code == KeyCode::Enter {
                                             // Handle Enter key for confirming object creation
                                             if game_state.is_drawing_select_box {
                                                 // Confirm object creation
-                                                if let Some((start_x, start_y)) = 
+                                                if let Some((start_x, start_y)) =
                                                     game_state.select_box_start_coords
                                                 {
                                                     let end_x = game_state.player.x;
@@ -835,8 +893,7 @@ fn run_app() -> io::Result<()> {
                     }
 
                     // Draw player collision box (always in debug mode)
-                    let (_, _, player_sprite_height) =
-                        game_state.player.get_sprite_content();
+                    let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
                     let collision_box_start_x = game_state.player.x;
                     let collision_box_start_y = game_state
                         .player
@@ -1010,7 +1067,7 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.show_message {
-                    let message_block = Block::default() 
+                    let message_block = Block::default()
                         .borders(Borders::ALL)
                         .border_type(ratatui::widgets::BorderType::Thick)
                         .border_style(Style::default().fg(Color::White).bg(Color::White))
@@ -1178,8 +1235,9 @@ fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
     loop {
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
-                tx.send(Event::Key(key))
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?; // Send KeyEvent directly
+                let _ = tx
+                    .send(Event::Key(key))
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)); // Send KeyEvent directly
             }
         }
     }
@@ -1187,9 +1245,7 @@ fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
 
 fn main() -> io::Result<()> {
     let result = run_app();
-
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
-
     result
 }
