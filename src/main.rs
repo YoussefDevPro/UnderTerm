@@ -25,6 +25,14 @@ use ratatui::{
 const PLAYER_INTERACTION_BOX_WIDTH: u16 = 30;
 const PLAYER_INTERACTION_BOX_HEIGHT: u16 = 20;
 
+const TOP_INTERACTION_BOX_HEIGHT: u16 = 10;
+const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 1;
+const LEFT_INTERACTION_BOX_WIDTH: u16 = 5;
+const RIGHT_INTERACTION_BOX_WIDTH: u16 = 5;
+
+const COLLISION_BOX_WIDTH: u16 = 21;
+const COLLISION_BOX_HEIGHT: u16 = 4;
+
 mod audio;
 mod game;
 
@@ -172,16 +180,16 @@ fn run_app() -> io::Result<()> {
                                         {
                                             map_to_modify.add_select_object_box(pending_box);
                                             if let Err(e) = map_to_modify.save_data() {
-                                                game_state.message =
+                                                game_state.message = 
                                                     format!("Failed to save map data: {}", e);
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time =
+                                                game_state.message_animation_start_time = 
                                                     Instant::now();
                                                 game_state.animated_message_content.clear();
                                             } else {
                                                 game_state.message = "SelectObjectBox created and saved with messages and events.".to_string();
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time =
+                                                game_state.message_animation_start_time = 
                                                     Instant::now();
                                                 game_state.animated_message_content.clear();
                                             }
@@ -386,74 +394,46 @@ fn run_app() -> io::Result<()> {
                                         // Normal game input
                                         if key.code == KeyCode::Enter {
                                             // Handle Enter key for interaction in normal mode
-                                            // Calculate the currently active PLAYER_INTERACTION_BOX's position and size
-                                            let (
-                                                _player_sprite_content,
-                                                player_sprite_width,
-                                                player_sprite_height,
-                                            ) = game_state.player.get_sprite_content();
-
-                                            let (mut interaction_box_x, mut interaction_box_y) =
-                                                (0, 0);
-                                            let (interaction_box_width, interaction_box_height) = (
-                                                PLAYER_INTERACTION_BOX_WIDTH,
-                                                PLAYER_INTERACTION_BOX_HEIGHT,
+                                            let (_, _, player_sprite_height) =
+                                                game_state.player.get_sprite_content();
+                                            let collision_box_x = game_state.player.x;
+                                            let collision_box_y = game_state
+                                                .player
+                                                .y
+                                                .saturating_add(player_sprite_height)
+                                                .saturating_sub(COLLISION_BOX_HEIGHT);
+                                            let collision_box = ratatui::layout::Rect::new(
+                                                collision_box_x,
+                                                collision_box_y,
+                                                COLLISION_BOX_WIDTH,
+                                                COLLISION_BOX_HEIGHT,
                                             );
 
-                                            match game_state.player.direction {
-                                                crate::game::player::PlayerDirection::Front => {
-                                                    interaction_box_x = game_state
-                                                        .player
-                                                        .x
-                                                        .saturating_add(player_sprite_width / 2)
-                                                        .saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_WIDTH / 2,
-                                                        );
-                                                    interaction_box_y = game_state
-                                                        .player
-                                                        .y
-                                                        .saturating_add(player_sprite_height);
-                                                }
-                                                crate::game::player::PlayerDirection::Back => {
-                                                    interaction_box_x = game_state
-                                                        .player
-                                                        .x
-                                                        .saturating_add(player_sprite_width / 2)
-                                                        .saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_WIDTH / 2,
-                                                        );
-                                                    interaction_box_y =
-                                                        game_state.player.y.saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_HEIGHT,
-                                                        );
-                                                }
-                                                crate::game::player::PlayerDirection::Left => {
-                                                    interaction_box_x =
-                                                        game_state.player.x.saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_WIDTH,
-                                                        );
-                                                    interaction_box_y = game_state
-                                                        .player
-                                                        .y
-                                                        .saturating_add(player_sprite_height / 2)
-                                                        .saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_HEIGHT / 2,
-                                                        );
-                                                }
-                                                crate::game::player::PlayerDirection::Right => {
-                                                    interaction_box_x = game_state
-                                                        .player
-                                                        .x
-                                                        .saturating_add(player_sprite_width);
-                                                    interaction_box_y = game_state
-                                                        .player
-                                                        .y
-                                                        .saturating_add(player_sprite_height / 2)
-                                                        .saturating_sub(
-                                                            PLAYER_INTERACTION_BOX_HEIGHT / 2,
-                                                        );
-                                                }
-                                            }
+                                            let top_box = ratatui::layout::Rect::new(
+                                                collision_box.x,
+                                                collision_box.y.saturating_sub(TOP_INTERACTION_BOX_HEIGHT),
+                                                collision_box.width,
+                                                TOP_INTERACTION_BOX_HEIGHT,
+                                            );
+                                            let bottom_box = ratatui::layout::Rect::new(
+                                                collision_box.x,
+                                                collision_box.y + collision_box.height,
+                                                collision_box.width,
+                                                BOTTOM_INTERACTION_BOX_HEIGHT,
+                                            );
+                                            let left_box = ratatui::layout::Rect::new(
+                                                collision_box.x.saturating_sub(LEFT_INTERACTION_BOX_WIDTH),
+                                                collision_box.y,
+                                                LEFT_INTERACTION_BOX_WIDTH,
+                                                collision_box.height,
+                                            );
+                                            let right_box = ratatui::layout::Rect::new(
+                                                collision_box.x + collision_box.width,
+                                                collision_box.y,
+                                                RIGHT_INTERACTION_BOX_WIDTH,
+                                                collision_box.height,
+                                            );
+                                            let interaction_boxes = [top_box, bottom_box, left_box, right_box];
 
                                             let current_map_key = (
                                                 game_state.current_map_row,
@@ -462,41 +442,33 @@ fn run_app() -> io::Result<()> {
                                             if let Some(current_map) =
                                                 game_state.loaded_maps.get(&current_map_key)
                                             {
-                                                for select_box in &current_map.select_object_boxes {
-                                                    // Check for overlap between the active interaction box and select_box
-                                                    let player_rect = // Renamed from player_rect to interaction_rect for clarity
-                                                        ratatui::layout::Rect::new(
-                                                            interaction_box_x,
-                                                            interaction_box_y,
-                                                            interaction_box_width,
-                                                            interaction_box_height,
-                                                        );
-                                                    let select_box_rect =
-                                                        ratatui::layout::Rect::new(
-                                                            select_box.x as u16,
-                                                            select_box.y as u16,
-                                                            select_box.width as u16,
-                                                            select_box.height as u16,
-                                                        );
+                                                'outer: for interaction_box in &interaction_boxes {
+                                                    for select_box in &current_map.select_object_boxes {
+                                                        let select_box_rect =
+                                                            ratatui::layout::Rect::new(
+                                                                select_box.x as u16,
+                                                                select_box.y as u16,
+                                                                select_box.width as u16,
+                                                                select_box.height as u16,
+                                                            );
 
-                                                    if player_rect.intersects(select_box_rect) {
-                                                        // Trigger message display
-                                                        if !select_box.messages.is_empty() {
-                                                            game_state.message =
-                                                                select_box.messages[0].clone(); // Start with the first message
-                                                            game_state.show_message = true;
-                                                            game_state
-                                                                .message_animation_start_time =
-                                                                Instant::now();
-                                                            game_state
-                                                                .animated_message_content
-                                                                .clear();
-                                                            game_state.current_interaction_box_id =
-                                                                Some(select_box.id); // Set the ID
-                                                            game_state.current_message_index = 0;
-                                                            // Start at the first message
+                                                        if interaction_box.intersects(select_box_rect) {
+                                                            if !select_box.messages.is_empty() {
+                                                                game_state.message =
+                                                                    select_box.messages[0].clone();
+                                                                game_state.show_message = true;
+                                                                game_state
+                                                                    .message_animation_start_time =
+                                                                    Instant::now();
+                                                                game_state
+                                                                    .animated_message_content
+                                                                    .clear();
+                                                                game_state.current_interaction_box_id =
+                                                                    Some(select_box.id);
+                                                                game_state.current_message_index = 0;
+                                                            }
+                                                            break 'outer;
                                                         }
-                                                        break; // Only interact with one box at a time
                                                     }
                                                 }
                                             }
@@ -516,7 +488,7 @@ fn run_app() -> io::Result<()> {
                                             // Handle Enter key for confirming object creation
                                             if game_state.is_drawing_select_box {
                                                 // Confirm object creation
-                                                if let Some((start_x, start_y)) =
+                                                if let Some((start_x, start_y)) = 
                                                     game_state.select_box_start_coords
                                                 {
                                                     let end_x = game_state.player.x;
@@ -720,52 +692,49 @@ fn run_app() -> io::Result<()> {
                         let (_player_sprite_content, player_sprite_width, player_sprite_height) =
                             game_state.player.get_sprite_content();
 
-                        let (mut select_box_x, mut select_box_y) = (0, 0);
                         let (select_box_width, select_box_height) =
                             (PLAYER_INTERACTION_BOX_WIDTH, PLAYER_INTERACTION_BOX_HEIGHT);
 
-                        match game_state.player.direction {
-                            crate::game::player::PlayerDirection::Front => {
-                                select_box_x = game_state
+                        let (select_box_x, select_box_y) = match game_state.player.direction {
+                            crate::game::player::PlayerDirection::Front => (
+                                game_state
                                     .player
                                     .x
                                     .saturating_add(player_sprite_width / 2)
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2);
-                                select_box_y =
-                                    game_state.player.y.saturating_add(player_sprite_height);
-                            }
-                            crate::game::player::PlayerDirection::Back => {
-                                select_box_x = game_state
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
+                                game_state.player.y.saturating_add(player_sprite_height),
+                            ),
+                            crate::game::player::PlayerDirection::Back => (
+                                game_state
                                     .player
                                     .x
                                     .saturating_add(player_sprite_width / 2)
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2);
-                                select_box_y = game_state
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
+                                game_state
                                     .player
                                     .y
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT);
-                            }
-                            crate::game::player::PlayerDirection::Left => {
-                                select_box_x = game_state
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
+                            ),
+                            crate::game::player::PlayerDirection::Left => (
+                                game_state
                                     .player
                                     .x
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH);
-                                select_box_y = game_state
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
+                                game_state
                                     .player
                                     .y
                                     .saturating_add(player_sprite_height / 2)
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2);
-                            }
-                            crate::game::player::PlayerDirection::Right => {
-                                select_box_x =
-                                    game_state.player.x.saturating_add(player_sprite_width);
-                                select_box_y = game_state
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
+                            ),
+                            crate::game::player::PlayerDirection::Right => (
+                                game_state.player.x.saturating_add(player_sprite_width),
+                                game_state
                                     .player
                                     .y
                                     .saturating_add(player_sprite_height / 2)
-                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2);
-                            }
-                        }
+                                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
+                            ),
+                        };
 
                         let select_box_x_on_screen =
                             select_box_x.saturating_sub(game_state.camera_x);
@@ -866,15 +835,14 @@ fn run_app() -> io::Result<()> {
                     }
 
                     // Draw player collision box (always in debug mode)
-                    let (_, player_sprite_width, player_sprite_height) =
+                    let (_, _, player_sprite_height) =
                         game_state.player.get_sprite_content();
-                    let collision_box_size = player_sprite_width.min(player_sprite_height);
                     let collision_box_start_x = game_state.player.x;
                     let collision_box_start_y = game_state
                         .player
                         .y
                         .saturating_add(player_sprite_height)
-                        .saturating_sub(collision_box_size);
+                        .saturating_sub(COLLISION_BOX_HEIGHT);
 
                     let collision_box_x_on_screen =
                         collision_box_start_x.saturating_sub(game_state.camera_x);
@@ -884,8 +852,8 @@ fn run_app() -> io::Result<()> {
                     let draw_rect = ratatui::layout::Rect::new(
                         collision_box_x_on_screen,
                         collision_box_y_on_screen,
-                        collision_box_size,
-                        collision_box_size,
+                        COLLISION_BOX_WIDTH,
+                        COLLISION_BOX_HEIGHT,
                     );
 
                     let clamped_rect = draw_rect.intersection(size);
@@ -898,7 +866,60 @@ fn run_app() -> io::Result<()> {
                         frame.render_widget(collision_box_paragraph, clamped_rect);
                     }
 
-                    
+                    let collision_box = ratatui::layout::Rect::new(
+                        collision_box_start_x,
+                        collision_box_start_y,
+                        COLLISION_BOX_WIDTH,
+                        COLLISION_BOX_HEIGHT,
+                    );
+
+                    let top_box = ratatui::layout::Rect::new(
+                        collision_box.x,
+                        collision_box.y.saturating_sub(TOP_INTERACTION_BOX_HEIGHT),
+                        collision_box.width,
+                        TOP_INTERACTION_BOX_HEIGHT,
+                    );
+                    let bottom_box = ratatui::layout::Rect::new(
+                        collision_box.x,
+                        collision_box.y + collision_box.height,
+                        collision_box.width,
+                        BOTTOM_INTERACTION_BOX_HEIGHT,
+                    );
+                    let left_box = ratatui::layout::Rect::new(
+                        collision_box.x.saturating_sub(LEFT_INTERACTION_BOX_WIDTH),
+                        collision_box.y,
+                        LEFT_INTERACTION_BOX_WIDTH,
+                        collision_box.height,
+                    );
+                    let right_box = ratatui::layout::Rect::new(
+                        collision_box.x + collision_box.width,
+                        collision_box.y,
+                        RIGHT_INTERACTION_BOX_WIDTH,
+                        collision_box.height,
+                    );
+                    let interaction_boxes = [top_box, bottom_box, left_box, right_box];
+
+                    for box_rect in &interaction_boxes {
+                        let box_on_screen_x = box_rect.x.saturating_sub(game_state.camera_x);
+                        let box_on_screen_y = box_rect.y.saturating_sub(game_state.camera_y);
+
+                        let draw_rect = ratatui::layout::Rect::new(
+                            box_on_screen_x,
+                            box_on_screen_y,
+                            box_rect.width,
+                            box_rect.height,
+                        );
+
+                        let clamped_rect = draw_rect.intersection(size);
+                        if !clamped_rect.is_empty() {
+                            let box_paragraph = Paragraph::new("").block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .border_style(Style::default().fg(Color::Yellow)),
+                            );
+                            frame.render_widget(box_paragraph, clamped_rect);
+                        }
+                    }
                 }
 
                 if game_state.is_drawing_select_box {
@@ -989,7 +1010,7 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.show_message {
-                    let message_block = Block::default()
+                    let message_block = Block::default() 
                         .borders(Borders::ALL)
                         .border_type(ratatui::widgets::BorderType::Thick)
                         .border_style(Style::default().fg(Color::White).bg(Color::White))

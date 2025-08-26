@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 // Constants for player collision
-const PLAYER_COLLISION_WIDTH: u16 = 2;
-const PLAYER_COLLISION_HEIGHT: u16 = 2;
+const PLAYER_COLLISION_WIDTH: u16 = 21;
+const PLAYER_COLLISION_HEIGHT: u16 = 4;
 
 // bring in new imports
 use super::config::{PLAYER_HORIZONTAL_SPEED, PLAYER_SPEED};
