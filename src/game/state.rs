@@ -6,6 +6,7 @@ use std::io::{self};
 use std::collections::HashMap;
 use ratatui::text::Text;
 use std::time::{Duration, Instant};
+use ratatui::layout::Rect;
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -16,6 +17,12 @@ fn default_duration() -> Duration {
 }
 
 use ansi_to_tui::IntoText;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeleportZone {
+    pub rect: Rect,
+    pub target_map_id: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -54,6 +61,8 @@ pub struct GameState {
     #[serde(skip)]
     pub history_index: usize,
     pub is_creating_map: bool,
+    #[serde(skip)]
+    pub teleport_zones: Vec<TeleportZone>,
 }
 
 impl GameState {
@@ -99,6 +108,7 @@ impl GameState {
             wall_history: vec![map.walls.clone()], // Initialize with current map walls
             history_index: 0,
             is_creating_map: false,
+            teleport_zones: Vec::new(),
         }
     }
 
@@ -165,6 +175,61 @@ impl GameState {
         // Prevent player movement if a message is being displayed
         if !*context.show_message {
             self.player.update(&mut context, key_states, animation_frame_duration);
+        }
+
+        // Teleportation logic
+        let (_player_sprite_content, _player_sprite_width, player_sprite_height) = self.player.get_sprite_content();
+        const COLLISION_BOX_WIDTH: u16 = 21;
+        const COLLISION_BOX_HEIGHT: u16 = 4;
+        let player_collision_box = ratatui::layout::Rect::new(
+            self.player.x,
+            self.player.y.saturating_add(player_sprite_height).saturating_sub(COLLISION_BOX_HEIGHT),
+            COLLISION_BOX_WIDTH,
+            COLLISION_BOX_HEIGHT,
+        );
+
+        let mut teleport_target: Option<(String, u16, u16)> = None;
+
+        for zone in &self.teleport_zones {
+            if player_collision_box.intersects(zone.rect) {
+                teleport_target = Some((zone.target_map_id.clone(), zone.rect.x, zone.rect.y));
+                break;
+            }
+        }
+
+        if let Some((target_map_id, target_x, target_y)) = teleport_target {
+            // Parse map_row and map_col from target_map_id
+            let map_parts: Vec<&str> = target_map_id.split('_').collect();
+            if map_parts.len() == 3 && map_parts[0] == "map" {
+                if let (Ok(map_row), Ok(map_col)) = (map_parts[1].parse::<i32>(), map_parts[2].parse::<i32>()) {
+                    self.current_map_row = map_row;
+                    self.current_map_col = map_col;
+                    self.current_map_name = target_map_id.clone();
+
+                    // Load the new map if not already loaded
+                    let new_map_key = (map_row, map_col);
+                    if !self.loaded_maps.contains_key(&new_map_key) {
+                        match Map::load(&target_map_id) {
+                            Ok(new_map) => {
+                                self.loaded_maps.insert(new_map_key, new_map);
+                            },
+                            Err(e) => {
+                                self.message = format!("Failed to load map for teleport: {}", e);
+                                self.show_message = true;
+                                self.message_animation_start_time = Instant::now();
+                                self.animated_message_content.clear();
+                            }
+                        }
+                    }
+
+                    // Set player position to the teleport zone's coordinates
+                    self.player.x = target_x;
+                    self.player.y = target_y;
+
+                    // Clear teleport zones after successful teleport
+                    self.teleport_zones.clear();
+                }
+            }
         }
 
         // Re-implement continuous camera logic
@@ -301,6 +366,10 @@ impl GameState {
         } else { // If animation is not finished, skip it
             self.skip_message_animation();
         }
+    }
+
+    pub fn get_teleport_zones(&self) -> &Vec<TeleportZone> {
+        &self.teleport_zones
     }
 }
 

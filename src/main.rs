@@ -529,108 +529,8 @@ fn run_app() -> io::Result<()> {
                                             }
                                         } else if key.code == KeyCode::F(2) {
                                             game_state.debug_mode = !game_state.debug_mode;
-                                        } else if key.code == KeyCode::F(3) {
-                                            if game_state.debug_mode {
-                                                game_state.is_creating_map = true;
-                                                game_state.is_text_input_active = true;
-                                                game_state.text_input_buffer.clear();
-                                                game_state.message =
-                                                    "Enter new map name (e.g., map_0_1):"
-                                                        .to_string();
-                                                game_state.show_message = true;
-                                                game_state.message_animation_start_time =
-                                                    Instant::now();
-                                                game_state.animated_message_content.clear();
-                                            }
-                                        } else if key.code == KeyCode::Enter {
-                                            // Handle Enter key for confirming object creation
-                                            if game_state.is_drawing_select_box {
-                                                // Confirm object creation
-                                                if let Some((start_x, start_y)) =
-                                                    game_state.select_box_start_coords
-                                                {
-                                                    let end_x = game_state.player.x;
-                                                    let end_y = game_state.player.y;
-
-                                                    let min_x = start_x.min(end_x);
-                                                    let max_x = start_x.max(end_x);
-                                                    let min_y = start_y.min(end_y);
-                                                    let max_y = start_y.max(end_y);
-
-                                                    let width = max_x
-                                                        .saturating_sub(min_x)
-                                                        .saturating_add(1);
-                                                    let height = max_y
-                                                        .saturating_sub(min_y)
-                                                        .saturating_add(1);
-
-                                                    if width > 0 && height > 0 {
-                                                        let current_map_key = (
-                                                            game_state.current_map_row,
-                                                            game_state.current_map_col,
-                                                        );
-                                                        if let Some(map_to_modify) = game_state
-                                                            .loaded_maps
-                                                            .get_mut(&current_map_key)
-                                                        {
-                                                            // Generate a simple ID (e.g., max existing ID + 1)
-                                                            let new_id = map_to_modify
-                                                                .select_object_boxes
-                                                                .iter()
-                                                                .map(|b| b.id)
-                                                                .max()
-                                                                .unwrap_or(0)
-                                                                + 1;
-
-                                                            let new_select_box =
-                                                                crate::game::map::SelectObjectBox {
-                                                                    id: new_id,
-                                                                    x: min_x as u32,
-                                                                    y: min_y as u32,
-                                                                    width: width as u32,
-                                                                    height: height as u32,
-                                                                    messages: Vec::new(), // Start with empty messages
-                                                                    events: Vec::new(), // Initialize with empty events
-                                                                };
-                                                            game_state.pending_select_box =
-                                                                Some(new_select_box); // Store for text input
-                                                            game_state.is_text_input_active = true;
-                                                            game_state.text_input_buffer.clear();
-                                                            game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
-                                                            game_state.show_message = true;
-                                                            game_state
-                                                                .message_animation_start_time =
-                                                                Instant::now();
-                                                            game_state
-                                                                .animated_message_content
-                                                                .clear();
-                                                        }
-                                                    }
-                                                }
-                                                game_state.is_drawing_select_box = false;
-                                                game_state.select_box_start_coords = None;
-                                            }
-                                        } else if key.code == KeyCode::Char('o') {
-                                            // Handle 'o' key for debug drawing
-                                            if game_state.is_drawing_select_box {
-                                                // If already drawing, cancel
-                                                game_state.is_drawing_select_box = false;
-                                                game_state.select_box_start_coords = None;
-                                                game_state.show_collision_box = false;
-                                            // Also turn off collision box visualization
-                                            } else {
-                                                // Start drawing
-                                                game_state.is_drawing_select_box = true;
-                                                game_state.select_box_start_coords = Some((
-                                                    game_state.player.x,
-                                                    game_state.player.y,
-                                                ));
-                                                game_state.show_collision_box = false;
-                                                // Turn off collision box visualization
-                                            }
                                         } else if game_state.debug_mode {
                                             // Debug-specific keys
-                                            // Handle debug-specific keys
                                             if key.code == KeyCode::Char('r') {
                                                 game_state.undo_wall_change();
                                             } else if key.code == KeyCode::Char('z') {
@@ -657,6 +557,105 @@ fn run_app() -> io::Result<()> {
                                                     game_state.message_animation_start_time =
                                                         Instant::now();
                                                     game_state.animated_message_content.clear();
+                                                }
+                                            } else if key.code == KeyCode::Char('t') {
+                                                // Handle 't' key for creating a teleport zone
+                                                let player_x = game_state.player.x;
+                                                let player_y = game_state.player.y;
+                                                let teleport_zone =
+                                                    crate::game::state::TeleportZone {
+                                                        rect: ratatui::layout::Rect::new(
+                                                            player_x, player_y, 1, 1,
+                                                        ),
+                                                        target_map_id: "map_0_1".to_string(), // Hardcoded target map
+                                                    };
+                                                game_state.teleport_zones.push(teleport_zone);
+                                                game_state.message = format!(
+                                                    "Teleport zone created at ({}, {}) to map_0_1.",
+                                                    player_x, player_y
+                                                );
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time =
+                                                    Instant::now();
+                                                game_state.animated_message_content.clear();
+                                            } else if key.code == KeyCode::F(3) {
+                                                game_state.is_creating_map = true;
+                                                game_state.is_text_input_active = true;
+                                                game_state.text_input_buffer.clear();
+                                                game_state.message =
+                                                    "Enter new map name (e.g., map_0_1):"
+                                                        .to_string();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time =
+                                                    Instant::now();
+                                                game_state.animated_message_content.clear();
+                                            } else if key.code == KeyCode::Enter {
+                                                // Handle Enter key for confirming object creation
+                                                if game_state.is_drawing_select_box {
+                                                    // Confirm object creation
+                                                    if let Some((start_x, start_y)) =
+                                                        game_state.select_box_start_coords
+                                                    {
+                                                        let end_x = game_state.player.x;
+                                                        let end_y = game_state.player.y;
+
+                                                        let min_x = start_x.min(end_x);
+                                                        let max_x = start_x.max(end_x);
+                                                        let min_y = start_y.min(end_y);
+                                                        let max_y = start_y.max(end_y);
+
+                                                        let width = max_x
+                                                            .saturating_sub(min_x)
+                                                            .saturating_add(1);
+                                                        let height = max_y
+                                                            .saturating_sub(min_y)
+                                                            .saturating_add(1);
+
+                                                        if width > 0 && height > 0 {
+                                                            let current_map_key = (
+                                                                game_state.current_map_row,
+                                                                game_state.current_map_col,
+                                                            );
+                                                            if let Some(map_to_modify) = game_state
+                                                                .loaded_maps
+                                                                .get_mut(&current_map_key)
+                                                            {
+                                                                // Generate a simple ID (e.g., max existing ID + 1)
+                                                                let new_id = map_to_modify
+                                                                    .select_object_boxes
+                                                                    .iter()
+                                                                    .map(|b| b.id)
+                                                                    .max()
+                                                                    .unwrap_or(0)
+                                                                    + 1;
+
+                                                                let new_select_box =
+                                                                    crate::game::map::SelectObjectBox {
+                                                                        id: new_id,
+                                                                        x: min_x as u32,
+                                                                        y: min_y as u32,
+                                                                        width: width as u32,
+                                                                        height: height as u32,
+                                                                        messages: Vec::new(), // Start with empty messages
+                                                                        events: Vec::new(), // Initialize with empty events
+                                                                    };
+                                                                game_state.pending_select_box =
+                                                                    Some(new_select_box); // Store for text input
+                                                                game_state.is_text_input_active = true;
+                                                                game_state.text_input_buffer.clear();
+                                                                game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
+                                                                game_state.show_message = true;
+                                                                game_state
+                                                                    .message_animation_start_time =
+                                                                    Instant::now();
+                                                                game_state
+                                                                    .animated_message_content
+                                                                    .clear();
+                                                            }
+                                                        }
+                                                    }
+                                                    game_state.is_drawing_select_box = false;
+                                                    game_state.select_box_start_coords = None;
                                                 }
                                             }
                                         }
@@ -712,7 +711,7 @@ fn run_app() -> io::Result<()> {
                 frame.render_widget(map_paragraph, size); // Then draw the map content on top
 
                 let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                let current_map = game_state.loaded_maps.get(&current_map_key).unwrap();
+                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
 
                 match current_map.kind {
                     crate::game::map::MapKind::Walls => {
@@ -845,6 +844,8 @@ fn run_app() -> io::Result<()> {
                         // Render nothing specific for Empty map kind
                     }
                 }
+            }
+
 
                 let (player_sprite_content, player_sprite_width, player_sprite_height) =
                     if game_state.debug_mode {
@@ -977,6 +978,29 @@ fn run_app() -> io::Result<()> {
                             frame.render_widget(box_paragraph, clamped_rect);
                         }
                     }
+
+                    // Render Teleport Zones
+                    for teleport_zone in game_state.get_teleport_zones() {
+                        let zone_on_screen_x = teleport_zone.rect.x.saturating_sub(game_state.camera_x);
+                        let zone_on_screen_y = teleport_zone.rect.y.saturating_sub(game_state.camera_y);
+
+                        let draw_rect = ratatui::layout::Rect::new(
+                            zone_on_screen_x,
+                            zone_on_screen_y,
+                            teleport_zone.rect.width,
+                            teleport_zone.rect.height,
+                        );
+
+                        let clamped_rect = draw_rect.intersection(size);
+                        if !clamped_rect.is_empty() {
+                            let zone_paragraph = Paragraph::new("").block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .border_style(Style::default().fg(Color::Magenta)),
+                            );
+                            frame.render_widget(zone_paragraph, clamped_rect);
+                        }
+                    }
                 }
 
                 if game_state.is_drawing_select_box {
@@ -1015,13 +1039,18 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.show_debug_panel {
+                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                    let (map_width, map_height, map_kind) = game_state.loaded_maps.get(&current_map_key)
+                        .map(|m| (m.width, m.height, format!("{:?}", m.kind)))
+                        .unwrap_or((0, 0, "N/A".to_string()));
+
                     let debug_text = vec![
                         format!("Player: ({}, {})", game_state.player.x, game_state.player.y),
                         format!("Direction: {:?}", game_state.player.direction),
                         format!("Animation Frame: {}", game_state.player.animation_frame),
                         format!("Is Walking: {}", game_state.player.is_walking),
                         format!("Camera: ({}, {})", game_state.camera_x, game_state.camera_y),
-                        format!("Map: ({}, {})", current_map.width, current_map.height),
+                        format!("Map: ({}, {})", map_width, map_height),
                         format!(
                             "Screen Player Pos: ({}, {})",
                             player_x_on_screen, player_y_on_screen
@@ -1034,8 +1063,9 @@ fn run_app() -> io::Result<()> {
                             game_state.current_map_col
                         ),
                         format!("Anim Frame Duration: {:?}", ANIMATION_FRAME_DURATION),
-                        format!("Map Kind: {:?}", current_map.kind), // Added Map Kind
+                        format!("Map Kind: {}", map_kind), // Updated Map Kind
                     ];
+
 
                     let debug_block = Block::default()
                         .borders(Borders::ALL)
@@ -1107,13 +1137,14 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.is_text_input_active {
+                    let title = if game_state.is_creating_map { "Enter New Map Name" } else { "Enter Message" };
                     let input_block = Block::default()
                         .borders(Borders::ALL)
                         .border_type(ratatui::widgets::BorderType::Thick)
                         .border_style(Style::default().fg(Color::White).bg(Color::White))
                         .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
                         .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
-                        .title("Enter Message");
+                        .title(title);
 
                     let input_paragraph = Paragraph::new(game_state.text_input_buffer.clone())
                         .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
