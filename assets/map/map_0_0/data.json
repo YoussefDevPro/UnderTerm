@@ -4248,5 +4248,25 @@
       ]
     }
   ],
-  "kind": "walls"
+  "kind": "walls",
+  "teleport_zones": [
+    {
+      "rect": {
+        "x": 395,
+        "y": 49,
+        "width": 1,
+        "height": 1
+      },
+      "target_map_id": "map_0_1"
+    },
+    {
+      "rect": {
+        "x": 395,
+        "y": 49,
+        "width": 1,
+        "height": 1
+      },
+      "target_map_id": "map_0_1"
+    }
+  ]
 }

@@ -26,7 +26,7 @@ const PLAYER_INTERACTION_BOX_WIDTH: u16 = 30;
 const PLAYER_INTERACTION_BOX_HEIGHT: u16 = 20;
 
 const TOP_INTERACTION_BOX_HEIGHT: u16 = 10;
-const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 1;
+const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 3;
 const LEFT_INTERACTION_BOX_WIDTH: u16 = 5;
 const RIGHT_INTERACTION_BOX_WIDTH: u16 = 5;
 
@@ -110,6 +110,72 @@ fn run_app() -> io::Result<()> {
                                         game_state.show_message = true;
                                         game_state.message_animation_start_time = Instant::now();
                                         game_state.animated_message_content.clear();
+                                    } else if game_state.is_teleport_input_active {
+                                        // Handle teleport target map ID input
+                                        let target_map_id =
+                                            game_state.text_input_buffer.trim().to_string();
+                                        if !target_map_id.is_empty() {
+                                            if let (Some((min_x, min_y)), Some((width, height))) = (
+                                                game_state.teleport_zone_start_coords,
+                                                game_state.select_box_start_coords,
+                                            ) {
+                                                let teleport_zone =
+                                                    crate::game::state::TeleportZone {
+                                                        rect: ratatui::layout::Rect::new(
+                                                            min_x, min_y, width, height,
+                                                        ),
+                                                        target_map_id: target_map_id.clone(),
+                                                    };
+
+                                                let current_map_key = (
+                                                    game_state.current_map_row,
+                                                    game_state.current_map_col,
+                                                );
+                                                if let Some(map_to_modify) =
+                                                    game_state.loaded_maps.get_mut(&current_map_key)
+                                                {
+                                                    map_to_modify.add_teleport_zone(teleport_zone);
+                                                    if let Err(e) = map_to_modify.save_data() {
+                                                        game_state.message = format!(
+                                                            "Failed to save map data: {}",
+                                                            e
+                                                        );
+                                                        game_state.show_message = true;
+                                                        game_state.message_animation_start_time =
+                                                            Instant::now();
+                                                        game_state.animated_message_content.clear();
+                                                    } else {
+                                                        game_state.message = format!(
+                                                            "Teleport zone created at ({}, {}) with size ({}, {}) to {}.",
+                                                            min_x,
+                                                            min_y,
+                                                            width,
+                                                            height,
+                                                            target_map_id
+                                                        );
+                                                        game_state.show_message = true;
+                                                        game_state.message_animation_start_time =
+                                                            Instant::now();
+                                                        game_state.animated_message_content.clear();
+                                                    }
+                                                }
+                                            } else {
+                                                game_state.message =
+                                                    "Error: Teleport zone dimensions not set."
+                                                        .to_string();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time =
+                                                    Instant::now();
+                                                game_state.animated_message_content.clear();
+                                            }
+                                        }
+                                        game_state.is_teleport_input_active = false;
+                                        game_state.is_text_input_active = false;
+                                        game_state.text_input_buffer.clear();
+                                        game_state.teleport_zone_start_coords = None; // Clear stored coords
+                                        game_state.select_box_start_coords = None; // Clear stored dimensions
+                                        game_state.is_drawing_teleport_zone = false;
+                                    // Add this line here
                                     } else {
                                         // When Enter is pressed, the current text in the buffer is added as a message.
                                         // It is not immediately displayed on the map, but stored for the SelectObjectBox.
@@ -129,27 +195,59 @@ fn run_app() -> io::Result<()> {
                                                 Instant::now();
                                             game_state.animated_message_content.clear();
                                         }
+                                        game_state.is_text_input_active = false;
+                                        // Reset text input active
                                     }
                                 }
                                 KeyCode::Esc => {
                                     // Finish text input and transition to event input
-                                    if let Some(ref mut pending_box) = game_state.pending_select_box
-                                    {
-                                        // If there's text in the buffer, add it as the last message
-                                        if !game_state.text_input_buffer.is_empty() {
-                                            pending_box
-                                                .messages
-                                                .push(game_state.text_input_buffer.clone());
-                                            game_state.text_input_buffer.clear();
+                                    if game_state.is_teleport_input_active {
+                                        game_state.is_teleport_input_active = false;
+                                        game_state.is_text_input_active = false;
+                                        game_state.text_input_buffer.clear();
+                                        game_state.teleport_zone_start_coords = None; // Clear stored coords
+                                        game_state.select_box_start_coords = None; // Clear stored dimensions
+                                        game_state.message =
+                                            "Teleport zone creation cancelled.".to_string();
+                                        game_state.show_message = true;
+                                        game_state.message_animation_start_time = Instant::now();
+                                        game_state.animated_message_content.clear();
+                                    } else if game_state.is_drawing_teleport_zone {
+                                        game_state.is_drawing_teleport_zone = false;
+                                        game_state.teleport_zone_start_coords = None;
+                                        game_state.message =
+                                            "Teleport zone drawing cancelled.".to_string();
+                                        game_state.show_message = true;
+                                        game_state.message_animation_start_time = Instant::now();
+                                        game_state.animated_message_content.clear();
+                                    } else if game_state.is_creating_map {
+                                        game_state.is_creating_map = false;
+                                        game_state.is_text_input_active = false;
+                                        game_state.text_input_buffer.clear();
+                                        game_state.message = "Map creation cancelled.".to_string();
+                                        game_state.show_message = true;
+                                        game_state.message_animation_start_time = Instant::now();
+                                        game_state.animated_message_content.clear();
+                                    } else {
+                                        if let Some(ref mut pending_box) =
+                                            game_state.pending_select_box
+                                        {
+                                            // If there's text in the buffer, add it as the last message
+                                            if !game_state.text_input_buffer.is_empty() {
+                                                pending_box
+                                                    .messages
+                                                    .push(game_state.text_input_buffer.clone());
+                                                game_state.text_input_buffer.clear();
+                                            }
                                         }
+                                        game_state.is_text_input_active = false;
+                                        game_state.text_input_buffer.clear();
+                                        game_state.is_event_input_active = true; // Transition to event input
+                                        game_state.message = "Enter events for the new object. Format: 'teleport x y map_row map_col'. Press Enter to add an event, Esc to finish.".to_string();
+                                        game_state.show_message = true;
+                                        game_state.message_animation_start_time = Instant::now();
+                                        game_state.animated_message_content.clear();
                                     }
-                                    game_state.is_text_input_active = false;
-                                    game_state.text_input_buffer.clear();
-                                    game_state.is_event_input_active = true; // Transition to event input
-                                    game_state.message = "Enter events for the new object. Format: 'teleport x y map_row map_col'. Press Enter to add an event, Esc to finish.".to_string();
-                                    game_state.show_message = true;
-                                    game_state.message_animation_start_time = Instant::now();
-                                    game_state.animated_message_content.clear();
                                 }
                                 _ => {}
                             }
@@ -560,24 +658,25 @@ fn run_app() -> io::Result<()> {
                                                 }
                                             } else if key.code == KeyCode::Char('t') {
                                                 // Handle 't' key for creating a teleport zone
-                                                let player_x = game_state.player.x;
-                                                let player_y = game_state.player.y;
-                                                let teleport_zone =
-                                                    crate::game::state::TeleportZone {
-                                                        rect: ratatui::layout::Rect::new(
-                                                            player_x, player_y, 1, 1,
-                                                        ),
-                                                        target_map_id: "map_0_1".to_string(), // Hardcoded target map
-                                                    };
-                                                game_state.teleport_zones.push(teleport_zone);
-                                                game_state.message = format!(
-                                                    "Teleport zone created at ({}, {}) to map_0_1.",
-                                                    player_x, player_y
-                                                );
-                                                game_state.show_message = true;
-                                                game_state.message_animation_start_time =
-                                                    Instant::now();
-                                                game_state.animated_message_content.clear();
+                                                if !game_state.is_drawing_teleport_zone {
+                                                    game_state.is_drawing_teleport_zone = true;
+                                                    game_state.teleport_zone_start_coords = Some((
+                                                        game_state.player.x,
+                                                        game_state.player.y,
+                                                    ));
+                                                    game_state.message = "Drawing teleport zone: Move player to set end point, then press Enter.".to_string();
+                                                    game_state.show_message = true;
+                                                    game_state.message_animation_start_time =
+                                                        Instant::now();
+                                                    game_state.animated_message_content.clear();
+                                                } else {
+                                                    // If already drawing, 't' does nothing until Enter is pressed
+                                                    game_state.message = "Finish drawing teleport zone by pressing Enter.".to_string();
+                                                    game_state.show_message = true;
+                                                    game_state.message_animation_start_time =
+                                                        Instant::now();
+                                                    game_state.animated_message_content.clear();
+                                                }
                                             } else if key.code == KeyCode::F(3) {
                                                 game_state.is_creating_map = true;
                                                 game_state.is_text_input_active = true;
@@ -641,8 +740,11 @@ fn run_app() -> io::Result<()> {
                                                                     };
                                                                 game_state.pending_select_box =
                                                                     Some(new_select_box); // Store for text input
-                                                                game_state.is_text_input_active = true;
-                                                                game_state.text_input_buffer.clear();
+                                                                game_state.is_text_input_active =
+                                                                    true;
+                                                                game_state
+                                                                    .text_input_buffer
+                                                                    .clear();
                                                                 game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
                                                                 game_state.show_message = true;
                                                                 game_state
@@ -656,6 +758,50 @@ fn run_app() -> io::Result<()> {
                                                     }
                                                     game_state.is_drawing_select_box = false;
                                                     game_state.select_box_start_coords = None;
+                                                } else if game_state.is_drawing_teleport_zone {
+                                                    // Confirm teleport zone creation
+                                                    if let Some((start_x, start_y)) =
+                                                        game_state.teleport_zone_start_coords
+                                                    {
+                                                        let end_x = game_state.player.x;
+                                                        let end_y = game_state.player.y;
+
+                                                        let min_x = start_x.min(end_x);
+                                                        let max_x = start_x.max(end_x);
+                                                        let min_y = start_y.min(end_y);
+                                                        let max_y = start_y.max(end_y);
+
+                                                        let width = max_x
+                                                            .saturating_sub(min_x)
+                                                            .saturating_add(1);
+                                                        let height = max_y
+                                                            .saturating_sub(min_y)
+                                                            .saturating_add(1);
+
+                                                        if width > 0 && height > 0 {
+                                                            // Store the rect temporarily and activate text input for target map ID
+                                                            game_state.is_teleport_input_active =
+                                                                true;
+                                                            game_state.is_text_input_active = true;
+                                                            game_state.text_input_buffer.clear();
+                                                            game_state.message = "Enter target map ID (e.g., map_0_1):".to_string();
+                                                            game_state.show_message = true;
+                                                            game_state
+                                                                .message_animation_start_time =
+                                                                Instant::now();
+                                                            game_state
+                                                                .animated_message_content
+                                                                .clear();
+
+                                                            // Store the rect for later use when target map ID is entered
+                                                            game_state.teleport_zone_start_coords =
+                                                                Some((min_x, min_y)); // Re-use start_coords to store min_x, min_y
+                                                            game_state.select_box_start_coords =
+                                                                Some((width, height));
+                                                            // Re-use select_box_start_coords to store width, height
+                                                        }
+                                                    }
+                                                    game_state.is_drawing_teleport_zone = false;
                                                 }
                                             }
                                         }
@@ -1038,6 +1184,41 @@ fn run_app() -> io::Result<()> {
                     }
                 }
 
+                if game_state.is_drawing_teleport_zone {
+                    // Draw the dynamic teleport zone being created
+                    if let Some((start_x, start_y)) = game_state.teleport_zone_start_coords {
+                        let current_x = game_state.player.x;
+                        let current_y = game_state.player.y;
+
+                        let min_x = start_x.min(current_x);
+                        let max_x = start_x.max(current_x);
+                        let min_y = start_y.min(current_y);
+                        let max_y = start_y.max(current_y);
+
+                        let width = max_x.saturating_sub(min_x).saturating_add(1);
+                        let height = max_y.saturating_sub(min_y).saturating_add(1);
+
+                        if width > 0 && height > 0 {
+                            let draw_rect = ratatui::layout::Rect::new(
+                                min_x.saturating_sub(game_state.camera_x),
+                                min_y.saturating_sub(game_state.camera_y),
+                                width,
+                                height,
+                            );
+
+                            let clamped_rect = draw_rect.intersection(size);
+                            if !clamped_rect.is_empty() {
+                                let drawing_box_paragraph = Paragraph::new("").block(
+                                    Block::default()
+                                        .borders(Borders::ALL)
+                                        .border_style(Style::default().fg(Color::Magenta)), // Magenta for teleport zones
+                                );
+                                frame.render_widget(drawing_box_paragraph, clamped_rect);
+                            }
+                        }
+                    }
+                }
+
                 if game_state.show_debug_panel {
                     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
                     let (map_width, map_height, map_kind) = game_state.loaded_maps.get(&current_map_key)
@@ -1137,7 +1318,13 @@ fn run_app() -> io::Result<()> {
                 }
 
                 if game_state.is_text_input_active {
-                    let title = if game_state.is_creating_map { "Enter New Map Name" } else { "Enter Message" };
+                    let title = if game_state.is_creating_map {
+                        "Enter New Map Name"
+                    } else if game_state.is_teleport_input_active {
+                        "Enter Target Map ID"
+                    } else {
+                        "Enter Message"
+                    };
                     let input_block = Block::default()
                         .borders(Borders::ALL)
                         .border_type(ratatui::widgets::BorderType::Thick)

@@ -59,6 +59,8 @@ pub struct PlayerUpdateContext<'a> {
     pub wall_history: &'a mut Vec<Vec<(u32, u32)>>,
     pub history_index: &'a mut usize,
     pub current_map_name: &'a mut String,
+    pub is_drawing_select_box: bool, // Added
+    pub is_drawing_teleport_zone: bool, // Added
 }
 
 impl Player {
@@ -209,7 +211,7 @@ impl Player {
         }
 
         if *key_states.get(&KeyCode::Enter).unwrap_or(&false) {
-            if context.debug_mode {
+            if context.debug_mode && !context.is_drawing_select_box && !context.is_drawing_teleport_zone {
                 let current_map_key = (*context.current_map_row, *context.current_map_col);
                 if let Some(map_to_modify) = context.loaded_maps.get_mut(&current_map_key) {
                     map_to_modify.toggle_wall(self.x as u32, self.y as u32);

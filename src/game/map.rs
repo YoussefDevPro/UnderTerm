@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use crate::game::state::TeleportZone;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum MapKind {
@@ -28,6 +29,8 @@ pub struct MapData {
     pub select_object_boxes: Vec<SelectObjectBox>,
     #[serde(default)] // Use default if kind is not specified in JSON
     pub kind: MapKind,
+    #[serde(default)]
+    pub teleport_zones: Vec<TeleportZone>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -58,6 +61,7 @@ pub struct Map {
     pub player_spawn: (u32, u32),
     pub select_object_boxes: Vec<SelectObjectBox>, // Added
     pub kind: MapKind, // Added
+    pub teleport_zones: Vec<TeleportZone>,
     pub width: u16,
     pub height: u16,
 }
@@ -103,6 +107,7 @@ impl Map {
             player_spawn: map_data.player_spawn,
             select_object_boxes: map_data.select_object_boxes,
             kind: map_data.kind, // Add this line
+            teleport_zones: map_data.teleport_zones,
             width,
             height,
         })
@@ -129,6 +134,7 @@ impl Map {
             walls: self.walls.clone(),
             select_object_boxes: self.select_object_boxes.clone(), // Added
             kind: self.kind.clone(), // Add this line
+            teleport_zones: self.teleport_zones.clone(),
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -138,6 +144,10 @@ impl Map {
 
     pub fn add_select_object_box(&mut self, select_object_box: SelectObjectBox) {
         self.select_object_boxes.push(select_object_box);
+    }
+
+    pub fn add_teleport_zone(&mut self, teleport_zone: TeleportZone) {
+        self.teleport_zones.push(teleport_zone);
     }
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -154,6 +164,7 @@ impl Map {
             walls: vec![],
             select_object_boxes: vec![],
             kind: MapKind::Empty,
+            teleport_zones: vec![],
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -169,6 +180,7 @@ impl Map {
             player_spawn: (10, 10),
             select_object_boxes: vec![],
             kind: MapKind::Empty,
+            teleport_zones: vec![],
             width: 0,
             height: 0,
         })

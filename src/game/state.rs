@@ -48,6 +48,8 @@ pub struct GameState {
     pub current_message_index: usize, // Added
     pub is_drawing_select_box: bool, // Added
     pub select_box_start_coords: Option<(u16, u16)>, // Added
+    pub is_drawing_teleport_zone: bool, // Added
+    pub teleport_zone_start_coords: Option<(u16, u16)>, // Added
     pub is_text_input_active: bool, // Added
     pub text_input_buffer: String, // Added
     pub pending_select_box: Option<crate::game::map::SelectObjectBox>, // Added
@@ -61,7 +63,7 @@ pub struct GameState {
     #[serde(skip)]
     pub history_index: usize,
     pub is_creating_map: bool,
-    #[serde(skip)]
+    pub is_teleport_input_active: bool, // Added
     pub teleport_zones: Vec<TeleportZone>,
 }
 
@@ -108,7 +110,10 @@ impl GameState {
             wall_history: vec![map.walls.clone()], // Initialize with current map walls
             history_index: 0,
             is_creating_map: false,
-            teleport_zones: Vec::new(),
+            is_teleport_input_active: false, // Initialize
+            is_drawing_teleport_zone: false, // Initialize
+            teleport_zone_start_coords: None, // Initialize
+            teleport_zones: map.teleport_zones, // Use map.teleport_zones
         }
     }
 
@@ -170,6 +175,8 @@ impl GameState {
             wall_history: &mut self.wall_history,
             history_index: &mut self.history_index,
             current_map_name: &mut self.current_map_name,
+            is_drawing_select_box: self.is_drawing_select_box, // Pass the flag
+            is_drawing_teleport_zone: self.is_drawing_teleport_zone, // Pass the flag
         };
 
         // Prevent player movement if a message is being displayed
@@ -222,12 +229,17 @@ impl GameState {
                         }
                     }
 
-                    // Set player position to the teleport zone's coordinates
-                    self.player.x = target_x;
-                    self.player.y = target_y;
+                    // Set player position to the target map's spawn coordinates
+                    if let Some(new_map) = self.loaded_maps.get(&new_map_key) {
+                        self.player.x = new_map.player_spawn.0 as u16;
+                        self.player.y = new_map.player_spawn.1 as u16;
+                    } else {
+                        // Fallback if new map not found (shouldn't happen if Map::load was successful)
+                        self.player.x = target_x;
+                        self.player.y = target_y;
+                    }
 
-                    // Clear teleport zones after successful teleport
-                    self.teleport_zones.clear();
+                    
                 }
             }
         }
