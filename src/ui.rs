@@ -145,6 +145,23 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         }
     }
 
+    if game_state.debug_mode {
+        let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+        if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+            for &(x, y) in &current_map.walls {
+                let draw_x = (x as u16).saturating_sub(game_state.camera_x);
+                let draw_y = (y as u16).saturating_sub(game_state.camera_y);
+
+                if draw_x < size.width && draw_y < size.height {
+                    let wall_paragraph = Paragraph::new("W")
+                        .style(Style::default().fg(Color::Red));
+                    let wall_rect = ratatui::layout::Rect::new(draw_x, draw_y, 1, 1);
+                    frame.render_widget(wall_paragraph, wall_rect);
+                }
+            }
+        }
+    }
+
     
 
     if game_state.show_message {

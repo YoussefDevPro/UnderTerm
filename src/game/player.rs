@@ -210,19 +210,13 @@ impl Player {
             }
         }
 
-        if *key_states.get(&KeyCode::Enter).unwrap_or(&false) {
+        if *key_states.get(&KeyCode::Char('w')).unwrap_or(&false) {
             if context.debug_mode && !context.is_drawing_select_box {
                 let current_map_key = (*context.current_map_row, *context.current_map_col);
                 if let Some(map_to_modify) = context.loaded_maps.get_mut(&current_map_key) {
                     map_to_modify.toggle_wall(self.x as u32, self.y as u32);
                     if let Err(e) = map_to_modify.save_data() {
                         *context.message = format!("Failed to save map data: {}", e);
-                        *context.show_message = true;
-                        *context.message_animation_start_time = Instant::now();
-                        context.animated_message_content.clear();
-                    } else {
-                        *context.message =
-                            format!("Toggled wall at ({}, {}) and saved.", self.x, self.y);
                         *context.show_message = true;
                         *context.message_animation_start_time = Instant::now();
                         context.animated_message_content.clear();
