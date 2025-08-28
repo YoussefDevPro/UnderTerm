@@ -32,7 +32,6 @@ pub fn process_events(
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {
             if game_state.is_text_input_active {
-                // Handle text input
                 match key.code {
                     KeyCode::Char(c) => {
                         game_state.text_input_buffer.push(c);
@@ -122,7 +121,10 @@ pub fn process_events(
                     }
                     _ => {}
                 }
-            } else if game_state.is_event_input_active {
+                continue;
+            }
+
+            if game_state.is_event_input_active {
                 match key.code {
                     KeyCode::Char(c) => game_state.text_input_buffer.push(c),
                     KeyCode::Backspace => {
@@ -170,7 +172,10 @@ pub fn process_events(
                     }
                     _ => {}
                 }
-            } else if game_state.show_message {
+                continue;
+            }
+
+            if game_state.show_message {
                 if key.code == KeyCode::Enter || key.code == KeyCode::Char('o') {
                     if game_state.message_animation_finished {
                         let mut teleport_target = None;
@@ -224,83 +229,87 @@ pub fn process_events(
                 } else if key.code == KeyCode::Char(' ') {
                     game_state.skip_message_animation();
                 }
-            } else {
-                match key.kind {
-                    event::KeyEventKind::Press => {
-                        key_states.insert(key.code, true);
-                        if game_state.is_map_kind_selection_active {
-                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                            if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
-                                match key.code {
-                                    KeyCode::Up => map_to_modify.kind = map_to_modify.kind.previous(),
-                                    KeyCode::Down => map_to_modify.kind = map_to_modify.kind.next(),
-                                    KeyCode::Enter => {
-                                        if let Err(e) = map_to_modify.save_data() {
-                                            game_state.message = format!("Failed to save map: {}", e);
-                                        } else {
-                                            game_state.message = format!("Map kind set to {:?}", map_to_modify.kind);
-                                        }
-                                        game_state.show_message = true;
-                                        game_state.message_animation_start_time = Instant::now();
-                                        game_state.animated_message_content.clear();
-                                        game_state.is_map_kind_selection_active = false;
-                                    }
-                                    KeyCode::Esc => game_state.is_map_kind_selection_active = false,
-                                    _ => {}
-                                }
-                            }
-                        } else if key.code == KeyCode::Enter {
-                            let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
-                            let collision_box_x = game_state.player.x;
-                            let collision_box_y = game_state.player.y.saturating_add(player_sprite_height).saturating_sub(4);
-                            let collision_box = ratatui::layout::Rect::new(collision_box_x, collision_box_y, 21, 4);
-                            let interaction_boxes = [
-                                ratatui::layout::Rect::new(collision_box.x, collision_box.y.saturating_sub(10), collision_box.width, 10),
-                                ratatui::layout::Rect::new(collision_box.x, collision_box.y + collision_box.height, collision_box.width, 3),
-                                ratatui::layout::Rect::new(collision_box.x.saturating_sub(5), collision_box.y, 5, collision_box.height),
-                                ratatui::layout::Rect::new(collision_box.x + collision_box.width, collision_box.y, 5, collision_box.height),
-                            ];
-                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                            if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                                for interaction_box in &interaction_boxes {
-                                    for select_box in &current_map.select_object_boxes {
-                                        let select_box_rect = ratatui::layout::Rect::new(select_box.x as u16, select_box.y as u16, select_box.width as u16, select_box.height as u16);
-                                        if interaction_box.intersects(select_box_rect) {
-                                            if !select_box.messages.is_empty() {
-                                                game_state.message = select_box.messages[0].clone();
-                                                game_state.show_message = true;
-                                                game_state.message_animation_start_time = Instant::now();
-                                                game_state.animated_message_content.clear();
-                                                game_state.current_interaction_box_id = Some(select_box.id);
-                                                game_state.current_message_index = 0;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else if key.code == KeyCode::Char('q') {
-                            game_state.save_game_state()?;
-                            return Ok(true);
-                        } else if key.code == KeyCode::F(1) {
-                            game_state.show_debug_panel = !game_state.show_debug_panel;
-                            if game_state.show_debug_panel {
-                                audio.play_open_settings_sound();
-                            }
-                        } else if key.code == KeyCode::F(2) {
-                            game_state.debug_mode = !game_state.debug_mode;
-                        } else if debug::input::handle_debug_input(key, game_state) {
-                            // Handled by debug module
-                        }
-                    }
-                    event::KeyEventKind::Release => {
-                        key_states.insert(key.code, false);
-                        if key.code == KeyCode::Char('o') && game_state.debug_mode {
-                            game_state.show_collision_box = false;
-                        }
-                    }
-                    _ => {}
+
+                if !(game_state.is_drawing_teleport_zone || game_state.is_drawing_select_box) {
+                    continue;
                 }
+            }
+
+            match key.kind {
+                event::KeyEventKind::Press => {
+                    key_states.insert(key.code, true);
+                    if game_state.is_map_kind_selection_active {
+                        let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                        if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                            match key.code {
+                                KeyCode::Up => map_to_modify.kind = map_to_modify.kind.previous(),
+                                KeyCode::Down => map_to_modify.kind = map_to_modify.kind.next(),
+                                KeyCode::Enter => {
+                                    if let Err(e) = map_to_modify.save_data() {
+                                        game_state.message = format!("Failed to save map: {}", e);
+                                    } else {
+                                        game_state.message = format!("Map kind set to {:?}", map_to_modify.kind);
+                                    }
+                                    game_state.show_message = true;
+                                    game_state.message_animation_start_time = Instant::now();
+                                    game_state.animated_message_content.clear();
+                                    game_state.is_map_kind_selection_active = false;
+                                }
+                                KeyCode::Esc => game_state.is_map_kind_selection_active = false,
+                                _ => {}
+                            }
+                        }
+                    } else if debug::input::handle_debug_input(key, game_state) {
+                        // Handled by debug module
+                    } else if key.code == KeyCode::Enter {
+                        let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
+                        let collision_box_x = game_state.player.x;
+                        let collision_box_y = game_state.player.y.saturating_add(player_sprite_height).saturating_sub(4);
+                        let collision_box = ratatui::layout::Rect::new(collision_box_x, collision_box_y, 21, 4);
+                        let interaction_boxes = [
+                            ratatui::layout::Rect::new(collision_box.x, collision_box.y.saturating_sub(10), collision_box.width, 10),
+                            ratatui::layout::Rect::new(collision_box.x, collision_box.y + collision_box.height, collision_box.width, 3),
+                            ratatui::layout::Rect::new(collision_box.x.saturating_sub(5), collision_box.y, 5, collision_box.height),
+                            ratatui::layout::Rect::new(collision_box.x + collision_box.width, collision_box.y, 5, collision_box.height),
+                        ];
+                        let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                        if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                            for interaction_box in &interaction_boxes {
+                                for select_box in &current_map.select_object_boxes {
+                                    let select_box_rect = ratatui::layout::Rect::new(select_box.x as u16, select_box.y as u16, select_box.width as u16, select_box.height as u16);
+                                    if interaction_box.intersects(select_box_rect) {
+                                        if !select_box.messages.is_empty() {
+                                            game_state.message = select_box.messages[0].clone();
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.animated_message_content.clear();
+                                            game_state.current_interaction_box_id = Some(select_box.id);
+                                            game_state.current_message_index = 0;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if key.code == KeyCode::Char('q') {
+                        game_state.save_game_state()?;
+                        return Ok(true);
+                    } else if key.code == KeyCode::F(1) {
+                        game_state.show_debug_panel = !game_state.show_debug_panel;
+                        if game_state.show_debug_panel {
+                            audio.play_open_settings_sound();
+                        }
+                    } else if key.code == KeyCode::F(2) {
+                        game_state.debug_mode = !game_state.debug_mode;
+                    }
+                }
+                event::KeyEventKind::Release => {
+                    key_states.insert(key.code, false);
+                    if key.code == KeyCode::Char('o') && game_state.debug_mode {
+                        game_state.show_collision_box = false;
+                    }
+                }
+                _ => {}
             }
         }
     }

@@ -1,8 +1,8 @@
 {
   "map_name": "map_0_0",
   "player_spawn": [
-    49,
-    1
+    88,
+    34
   ],
   "walls": [
     [
@@ -4267,6 +4267,15 @@
         "height": 1
       },
       "target_map_id": "map_0_1"
+    },
+    {
+      "rect": {
+        "x": 221,
+        "y": 16,
+        "width": 1,
+        "height": 1
+      },
+      "target_map_id": "map_1_2"
     }
   ]
 }

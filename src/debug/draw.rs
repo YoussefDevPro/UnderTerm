@@ -156,6 +156,31 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
+    // Render SelectObjectBoxes
+    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+        for select_box in &current_map.select_object_boxes {
+            let select_box_x_on_screen = select_box.x.saturating_sub(game_state.camera_x as u32);
+            let select_box_y_on_screen = select_box.y.saturating_sub(game_state.camera_y as u32);
+
+            let draw_rect = Rect::new(
+                select_box_x_on_screen as u16,
+                select_box_y_on_screen as u16,
+                select_box.width as u16,
+                select_box.height as u16,
+            );
+
+            let clamped_rect = draw_rect.intersection(size);
+            if !clamped_rect.is_empty() {
+                let select_box_paragraph = Paragraph::new("").block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                );
+                frame.render_widget(select_box_paragraph, clamped_rect);
+            }
+        }
+    }
+
     if game_state.show_debug_panel {
         draw_debug_panel(frame, game_state);
     }
