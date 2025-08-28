@@ -1,4 +1,4 @@
-use crate::game::utils;
+
 use super::player::{Player, PlayerUpdateContext};
 use super::map::Map;
 use crossterm::event::KeyCode;
@@ -45,8 +45,7 @@ pub struct GameState {
     pub current_message_index: usize, // Added
     pub is_drawing_select_box: bool, // Added
     pub select_box_start_coords: Option<(u16, u16)>, // Added
-    pub is_drawing_teleport_zone: bool, // Added
-    pub teleport_zone_start_coords: Option<(u16, u16)>, // Added
+    
     pub is_text_input_active: bool, // Added
     pub text_input_buffer: String, // Added
     pub pending_select_box: Option<crate::game::map::SelectObjectBox>, // Added
@@ -108,9 +107,7 @@ impl GameState {
             history_index: 0,
             is_creating_map: false,
             is_teleport_input_active: false, // Initialize
-            is_drawing_teleport_zone: false, // Initialize
-            teleport_zone_start_coords: None, // Initialize
-            teleport_zones: map.teleport_zones, // Use map.teleport_zones
+            
         }
     }
 
@@ -173,54 +170,12 @@ impl GameState {
             history_index: &mut self.history_index,
             current_map_name: &mut self.current_map_name,
             is_drawing_select_box: self.is_drawing_select_box, // Pass the flag
-            is_drawing_teleport_zone: self.is_drawing_teleport_zone, // Pass the flag
+            
         };
 
         // Prevent player movement if a message is being displayed
         if !*context.show_message {
             self.player.update(&mut context, key_states, animation_frame_duration);
-        }
-
-        
-
-        if let Some((target_map_id, target_x, target_y)) = teleport_target {
-            // Parse map_row and map_col from target_map_id
-            let map_parts: Vec<&str> = target_map_id.split('_').collect();
-            if map_parts.len() == 3 && map_parts[0] == "map" {
-                if let (Ok(map_row), Ok(map_col)) = (map_parts[1].parse::<i32>(), map_parts[2].parse::<i32>()) {
-                    self.current_map_row = map_row;
-                    self.current_map_col = map_col;
-                    self.current_map_name = target_map_id.clone();
-
-                    // Load the new map if not already loaded
-                    let new_map_key = (map_row, map_col);
-                    if !self.loaded_maps.contains_key(&new_map_key) {
-                        match Map::load(&target_map_id) {
-                            Ok(new_map) => {
-                                self.loaded_maps.insert(new_map_key, new_map);
-                            },
-                            Err(e) => {
-                                self.message = format!("Failed to load map for teleport: {}", e);
-                                self.show_message = true;
-                                self.message_animation_start_time = Instant::now();
-                                self.animated_message_content.clear();
-                            }
-                        }
-                    }
-
-                    // Set player position to the target map's spawn coordinates
-                    if let Some(new_map) = self.loaded_maps.get(&new_map_key) {
-                        self.player.x = new_map.player_spawn.0 as u16;
-                        self.player.y = new_map.player_spawn.1 as u16;
-                    } else {
-                        // Fallback if new map not found (shouldn't happen if Map::load was successful)
-                        self.player.x = target_x;
-                        self.player.y = target_y;
-                    }
-
-                    
-                }
-            }
         }
 
         // Re-implement continuous camera logic
@@ -359,9 +314,7 @@ impl GameState {
         }
     }
 
-    pub fn get_teleport_zones(&self) -> &Vec<TeleportZone> {
-        &self.teleport_zones
-    }
+    
 }
 
 #[derive(Debug, Serialize, Deserialize)]

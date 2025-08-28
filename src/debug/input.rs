@@ -24,18 +24,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             game_state.message_animation_start_time = Instant::now();
             game_state.animated_message_content.clear();
         }
-        KeyCode::Char('t') => {
-            if !game_state.is_drawing_interactable {
-                game_state.is_drawing_interactable = true;
-                game_state.select_box_start_coords = Some((game_state.player.x, game_state.player.y));
-                game_state.message = "Drawing interactable line: Move player to set end point, then press Enter.".to_string();
-            } else {
-                game_state.message = "Finish drawing interactable line by pressing Enter.".to_string();
-            }
-            game_state.show_message = true;
-            game_state.message_animation_start_time = Instant::now();
-            game_state.animated_message_content.clear();
-        }
+        
         KeyCode::F(3) => {
             game_state.is_creating_map = true;
             game_state.is_text_input_active = true;
@@ -72,21 +61,8 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                 }
                 game_state.is_drawing_select_box = false;
                 game_state.select_box_start_coords = None;
-            } else if game_state.is_drawing_interactable {
-                if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-                    let (end_x, end_y) = (game_state.player.x, game_state.player.y);
-                    game_state.is_teleport_input_active = true;
-                    game_state.is_text_input_active = true;
-                    game_state.text_input_buffer.clear();
-                    game_state.message = "Enter target map ID (e.g., map_0_1):".to_string();
-                    game_state.show_message = true;
-                    game_state.message_animation_start_time = Instant::now();
-                    game_state.animated_message_content.clear();
-                    game_state.teleport_zone_start_coords = Some((start_x, start_y));
-                    game_state.select_box_start_coords = Some((end_x, end_y)); // Using this to store end coords
-                }
-                game_state.is_drawing_interactable = false;
             }
+            
         }
         _ => return false,
     }

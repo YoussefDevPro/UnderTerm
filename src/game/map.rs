@@ -182,7 +182,6 @@ impl Map {
             walls: vec![],
             select_object_boxes: vec![],
             kind: MapKind::Empty,
-            teleport_zones: vec![],
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -198,7 +197,6 @@ impl Map {
             player_spawn: (10, 10),
             select_object_boxes: vec![],
             kind: MapKind::Empty,
-            teleport_zones: vec![],
             width: 0,
             height: 0,
         })

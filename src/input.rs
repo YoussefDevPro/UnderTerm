@@ -60,40 +60,6 @@ pub fn process_events(
                             game_state.show_message = true;
                             game_state.message_animation_start_time = Instant::now();
                             game_state.animated_message_content.clear();
-                        } else if game_state.is_teleport_input_active {
-                            let target_map_id = game_state.text_input_buffer.trim().to_string();
-                            if !target_map_id.is_empty() {
-                                if let (Some((x1, y1)), Some((x2, y2))) = (
-                                    game_state.teleport_zone_start_coords,
-                                    game_state.select_box_start_coords,
-                                ) {
-                                    let teleport_zone = crate::game::state::TeleportZone {
-                                        x1,
-                                        y1,
-                                        x2,
-                                        y2,
-                                        target_map_id: target_map_id.clone(),
-                                    };
-                                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                    if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
-                                        map_to_modify.add_teleport_zone(teleport_zone);
-                                        if let Err(e) = map_to_modify.save_data() {
-                                            game_state.message = format!("Failed to save map data: {}", e);
-                                        } else {
-                                            game_state.message = format!("Teleport zone created to {}.", target_map_id);
-                                        }
-                                        game_state.show_message = true;
-                                        game_state.message_animation_start_time = Instant::now();
-                                        game_state.animated_message_content.clear();
-                                    }
-                                }
-                            }
-                            game_state.is_teleport_input_active = false;
-                            game_state.is_text_input_active = false;
-                            game_state.text_input_buffer.clear();
-                            game_state.teleport_zone_start_coords = None;
-                            game_state.select_box_start_coords = None;
-                            game_state.is_drawing_teleport_zone = false;
                         } else if let Some(ref mut pending_box) = game_state.pending_select_box {
                             pending_box.messages.push(game_state.text_input_buffer.clone());
                             game_state.text_input_buffer.clear();
@@ -110,11 +76,6 @@ pub fn process_events(
                         if game_state.is_creating_map {
                             game_state.is_creating_map = false;
                             game_state.message = "Map creation cancelled.".to_string();
-                        } else if game_state.is_teleport_input_active {
-                            game_state.is_teleport_input_active = false;
-                            game_state.teleport_zone_start_coords = None;
-                            game_state.select_box_start_coords = None;
-                            game_state.message = "Teleport zone creation cancelled.".to_string();
                         } else {
                             game_state.is_event_input_active = true;
                             game_state.message = "Enter events. Format: 'teleport x y map_row map_col'. Esc to finish.".to_string();
@@ -234,7 +195,7 @@ pub fn process_events(
                     game_state.skip_message_animation();
                 }
 
-                if !(game_state.is_drawing_teleport_zone || game_state.is_drawing_select_box) {
+                if !(game_state.is_drawing_select_box) {
                     continue;
                 }
             }
