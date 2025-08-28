@@ -1,6 +1,7 @@
 use crate::game::config::ANIMATION_FRAME_DURATION;
 use crate::game::state::GameState;
 
+use crate::game::utils::get_line_points;
 use ratatui::{
     layout::{Rect},
     style::{Color, Style},
@@ -133,50 +134,26 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Render Teleport Zones
-    for teleport_zone in game_state.get_teleport_zones() {
-        let zone_on_screen_x = teleport_zone.rect.x.saturating_sub(game_state.camera_x);
-        let zone_on_screen_y = teleport_zone.rect.y.saturating_sub(game_state.camera_y);
-
-        let draw_rect = Rect::new(
-            zone_on_screen_x,
-            zone_on_screen_y,
-            teleport_zone.rect.width,
-            teleport_zone.rect.height,
-        );
-
-        let clamped_rect = draw_rect.intersection(size);
-        if !clamped_rect.is_empty() {
-            let zone_paragraph = Paragraph::new("").block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Magenta)),
-            );
-            frame.render_widget(zone_paragraph, clamped_rect);
-        }
-    }
+    
 
     // Render SelectObjectBoxes
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         for select_box in &current_map.select_object_boxes {
-            let select_box_x_on_screen = select_box.x.saturating_sub(game_state.camera_x as u32);
-            let select_box_y_on_screen = select_box.y.saturating_sub(game_state.camera_y as u32);
-
-            let draw_rect = Rect::new(
-                select_box_x_on_screen as u16,
-                select_box_y_on_screen as u16,
-                select_box.width as u16,
-                select_box.height as u16,
+            let points = get_line_points(
+                select_box.x1 as i32,
+                select_box.y1 as i32,
+                select_box.x2 as i32,
+                select_box.y2 as i32,
             );
+            for (x, y) in points {
+                let select_box_x_on_screen = (x as u16).saturating_sub(game_state.camera_x);
+                let select_box_y_on_screen = (y as u16).saturating_sub(game_state.camera_y);
 
-            let clamped_rect = draw_rect.intersection(size);
-            if !clamped_rect.is_empty() {
-                let select_box_paragraph = Paragraph::new("").block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Cyan)),
-                );
-                frame.render_widget(select_box_paragraph, clamped_rect);
+                if select_box_x_on_screen < size.width && select_box_y_on_screen < size.height {
+                    let draw_rect = Rect::new(select_box_x_on_screen, select_box_y_on_screen, 1, 1);
+                    let select_box_paragraph = Paragraph::new("I").style(Style::default().fg(Color::Cyan));
+                    frame.render_widget(select_box_paragraph, draw_rect);
+                }
             }
         }
     }

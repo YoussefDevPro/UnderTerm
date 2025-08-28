@@ -6,6 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::game::utils;
 use crossterm::event::{self, Event, KeyCode};
 
 use crate::game::state::GameState;
@@ -62,12 +63,15 @@ pub fn process_events(
                         } else if game_state.is_teleport_input_active {
                             let target_map_id = game_state.text_input_buffer.trim().to_string();
                             if !target_map_id.is_empty() {
-                                if let (Some((min_x, min_y)), Some((width, height))) = (
+                                if let (Some((x1, y1)), Some((x2, y2))) = (
                                     game_state.teleport_zone_start_coords,
                                     game_state.select_box_start_coords,
                                 ) {
                                     let teleport_zone = crate::game::state::TeleportZone {
-                                        rect: ratatui::layout::Rect::new(min_x, min_y, width, height),
+                                        x1,
+                                        y1,
+                                        x2,
+                                        y2,
                                         target_map_id: target_map_id.clone(),
                                     };
                                     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
@@ -274,18 +278,25 @@ pub fn process_events(
                         ];
                         let current_map_key = (game_state.current_map_row, game_state.current_map_col);
                         if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                            for interaction_box in &interaction_boxes {
-                                for select_box in &current_map.select_object_boxes {
-                                    let select_box_rect = ratatui::layout::Rect::new(select_box.x as u16, select_box.y as u16, select_box.width as u16, select_box.height as u16);
-                                    if interaction_box.intersects(select_box_rect) {
-                                        if !select_box.messages.is_empty() {
-                                            game_state.message = select_box.messages[0].clone();
-                                            game_state.show_message = true;
-                                            game_state.message_animation_start_time = Instant::now();
-                                            game_state.animated_message_content.clear();
-                                            game_state.current_interaction_box_id = Some(select_box.id);
-                                            game_state.current_message_index = 0;
-                                            break;
+                            'outer: for select_box in &current_map.select_object_boxes {
+                                let line_points = utils::get_line_points(
+                                    select_box.x1 as i32,
+                                    select_box.y1 as i32,
+                                    select_box.x2 as i32,
+                                    select_box.y2 as i32,
+                                );
+                                for point in line_points {
+                                    for interaction_box in &interaction_boxes {
+                                        if interaction_box.contains(ratatui::layout::Position::new(point.0 as u16, point.1 as u16)) {
+                                            if !select_box.messages.is_empty() {
+                                                game_state.message = select_box.messages[0].clone();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time = Instant::now();
+                                                game_state.animated_message_content.clear();
+                                                game_state.current_interaction_box_id = Some(select_box.id);
+                                                game_state.current_message_index = 0;
+                                                break 'outer;
+                                            }
                                         }
                                     }
                                 }

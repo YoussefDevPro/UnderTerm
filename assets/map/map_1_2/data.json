@@ -27,5 +27,16 @@
       ]
     }
   ],
-  "kind": "empty"
+  "kind": "empty",
+  "teleport_zones": [
+    {
+      "rect": {
+        "x": 130,
+        "y": 89,
+        "width": 1,
+        "height": 1
+      },
+      "target_map_id": "map_0_0"
+    }
+  ]
 }

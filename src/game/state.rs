@@ -1,3 +1,4 @@
+use crate::game::utils;
 use super::player::{Player, PlayerUpdateContext};
 use super::map::Map;
 use crossterm::event::KeyCode;
@@ -6,7 +7,7 @@ use std::io::{self};
 use std::collections::HashMap;
 use ratatui::text::Text;
 use std::time::{Duration, Instant};
-use ratatui::layout::Rect;
+
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -18,11 +19,7 @@ fn default_duration() -> Duration {
 
 use ansi_to_tui::IntoText;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TeleportZone {
-    pub rect: Rect,
-    pub target_map_id: String,
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -64,7 +61,7 @@ pub struct GameState {
     pub history_index: usize,
     pub is_creating_map: bool,
     pub is_teleport_input_active: bool, // Added
-    pub teleport_zones: Vec<TeleportZone>,
+    
 }
 
 impl GameState {
@@ -184,25 +181,7 @@ impl GameState {
             self.player.update(&mut context, key_states, animation_frame_duration);
         }
 
-        // Teleportation logic
-        let (_player_sprite_content, _player_sprite_width, player_sprite_height) = self.player.get_sprite_content();
-        const COLLISION_BOX_WIDTH: u16 = 21;
-        const COLLISION_BOX_HEIGHT: u16 = 4;
-        let player_collision_box = ratatui::layout::Rect::new(
-            self.player.x,
-            self.player.y.saturating_add(player_sprite_height).saturating_sub(COLLISION_BOX_HEIGHT),
-            COLLISION_BOX_WIDTH,
-            COLLISION_BOX_HEIGHT,
-        );
-
-        let mut teleport_target: Option<(String, u16, u16)> = None;
-
-        for zone in &self.teleport_zones {
-            if player_collision_box.intersects(zone.rect) {
-                teleport_target = Some((zone.target_map_id.clone(), zone.rect.x, zone.rect.y));
-                break;
-            }
-        }
+        
 
         if let Some((target_map_id, target_x, target_y)) = teleport_target {
             // Parse map_row and map_col from target_map_id

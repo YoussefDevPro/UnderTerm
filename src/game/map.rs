@@ -1,4 +1,4 @@
-use crate::game::state::TeleportZone;
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -47,8 +47,7 @@ pub struct MapData {
     pub select_object_boxes: Vec<SelectObjectBox>,
     #[serde(default)] // Use default if kind is not specified in JSON
     pub kind: MapKind,
-    #[serde(default)]
-    pub teleport_zones: Vec<TeleportZone>,
+    
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,10 +64,10 @@ pub enum Event {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectObjectBox {
     pub id: u32,
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
+    pub x1: u32,
+    pub y1: u32,
+    pub x2: u32,
+    pub y2: u32,
     pub messages: Vec<String>,
     #[serde(default)] // Use default if events are not specified
     pub events: Vec<Event>, // Added
@@ -84,7 +83,7 @@ pub struct Map {
     pub player_spawn: (u32, u32),
     pub select_object_boxes: Vec<SelectObjectBox>, // Added
     pub kind: MapKind,                             // Added
-    pub teleport_zones: Vec<TeleportZone>,
+    
     pub width: u16,
     pub height: u16,
 }
@@ -130,7 +129,7 @@ impl Map {
             player_spawn: map_data.player_spawn,
             select_object_boxes: map_data.select_object_boxes,
             kind: map_data.kind, // Add this line
-            teleport_zones: map_data.teleport_zones,
+            
             width,
             height,
         })
@@ -155,7 +154,7 @@ impl Map {
             walls: self.walls.clone(),
             select_object_boxes: self.select_object_boxes.clone(),
             kind: self.kind.clone(),
-            teleport_zones: self.teleport_zones.clone(),
+            
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -167,9 +166,7 @@ impl Map {
         self.select_object_boxes.push(select_object_box);
     }
 
-    pub fn add_teleport_zone(&mut self, teleport_zone: TeleportZone) {
-        self.teleport_zones.push(teleport_zone);
-    }
+    
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(map_name);
