@@ -1,7 +1,7 @@
 use crate::debug;
 use crate::game::state::GameState;
 use ansi_to_tui::IntoText;
-use crate::game::utils::get_line_points;
+
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
@@ -132,16 +132,22 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             let current_x = game_state.player.x;
             let current_y = game_state.player.y;
 
-            let points = get_line_points(start_x as i32, start_y as i32, current_x as i32, current_y as i32);
-            for (x, y) in points {
-                let draw_x = (x as u16).saturating_sub(game_state.camera_x);
-                let draw_y = (y as u16).saturating_sub(game_state.camera_y);
-                if draw_x < size.width && draw_y < size.height {
-                    let draw_rect = ratatui::layout::Rect::new(draw_x, draw_y, 1, 1);
-                    let drawing_paragraph = Paragraph::new("*").style(Style::default().fg(Color::Yellow));
-                    frame.render_widget(drawing_paragraph, draw_rect);
-                }
-            }
+            let min_x = start_x.min(current_x);
+            let max_x = start_x.max(current_x);
+            let min_y = start_y.min(current_y);
+            let max_y = start_y.max(current_y);
+
+            let width = max_x.saturating_sub(min_x).saturating_add(1);
+            let height = max_y.saturating_sub(min_y).saturating_add(1);
+
+            let draw_x = min_x.saturating_sub(game_state.camera_x);
+            let draw_y = min_y.saturating_sub(game_state.camera_y);
+
+            let draw_rect = ratatui::layout::Rect::new(draw_x, draw_y, width, height);
+            let drawing_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow));
+            frame.render_widget(drawing_block, draw_rect);
         }
     }
 

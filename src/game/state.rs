@@ -45,6 +45,8 @@ pub struct GameState {
     pub current_message_index: usize, // Added
     pub is_drawing_select_box: bool, // Added
     pub select_box_start_coords: Option<(u16, u16)>, // Added
+    pub is_confirming_select_box: bool, // New field
+    pub block_player_movement_on_message: bool, // New field
     
     pub is_text_input_active: bool, // Added
     pub text_input_buffer: String, // Added
@@ -95,6 +97,8 @@ impl GameState {
             current_message_index: 0, // Initialize
             is_drawing_select_box: false, // Initialize
             select_box_start_coords: None, // Initialize
+            is_confirming_select_box: false, // Initialize
+            block_player_movement_on_message: true, // Initialize
             is_text_input_active: false, // Initialize
             text_input_buffer: String::new(), // Initialize
             pending_select_box: None, // Initialize
@@ -141,6 +145,14 @@ impl GameState {
     }
 
     pub fn update(&mut self, key_states: &HashMap<KeyCode, bool>, frame_size: ratatui::layout::Rect, animation_frame_duration: std::time::Duration) {
+        // Dismiss message if confirming select box and player moves
+        if self.is_confirming_select_box && (*key_states.get(&KeyCode::Up).unwrap_or(&false) ||
+                                             *key_states.get(&KeyCode::Down).unwrap_or(&false) ||
+                                             *key_states.get(&KeyCode::Left).unwrap_or(&false) ||
+                                             *key_states.get(&KeyCode::Right).unwrap_or(&false)) {
+            self.dismiss_message();
+        }
+
         // Update animated message content
         if self.show_message {
             let elapsed = self.message_animation_start_time.elapsed();
@@ -170,11 +182,11 @@ impl GameState {
             history_index: &mut self.history_index,
             current_map_name: &mut self.current_map_name,
             is_drawing_select_box: self.is_drawing_select_box, // Pass the flag
-            
+            block_player_movement_on_message: &mut self.block_player_movement_on_message, // Pass the flag
         };
 
-        // Prevent player movement if a message is being displayed
-        if !*context.show_message {
+        // Prevent player movement if a message is being displayed and movement is blocked
+        if !(*context.show_message && *context.block_player_movement_on_message) {
             self.player.update(&mut context, key_states, animation_frame_duration);
         }
 

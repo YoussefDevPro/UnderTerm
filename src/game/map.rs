@@ -64,13 +64,19 @@ pub enum Event {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectObjectBox {
     pub id: u32,
-    pub x1: u32,
-    pub y1: u32,
-    pub x2: u32,
-    pub y2: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
     pub messages: Vec<String>,
     #[serde(default)] // Use default if events are not specified
     pub events: Vec<Event>, // Added
+}
+
+impl SelectObjectBox {
+    pub fn to_rect(&self) -> ratatui::layout::Rect {
+        ratatui::layout::Rect::new(self.x as u16, self.y as u16, self.width as u16, self.height as u16)
+    }
 }
 
 use ansi_to_tui::IntoText;

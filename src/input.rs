@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::game::utils;
+
 use crossterm::event::{self, Event, KeyCode};
 
 use crate::game::state::GameState;
@@ -134,59 +134,81 @@ pub fn process_events(
                         }
                         game_state.is_event_input_active = false;
                         game_state.text_input_buffer.clear();
+                        game_state.is_drawing_select_box = false; // Reset drawing flag
+                        game_state.block_player_movement_on_message = true; // Block movement again
                     }
                     _ => {}
                 }
                 continue;
             }
 
+            let mut teleport_target = None;
             if game_state.show_message {
                 if key.code == KeyCode::Enter || key.code == KeyCode::Char('o') {
                     if game_state.message_animation_finished {
-                        let mut teleport_target = None;
-                        if let Some(box_id) = game_state.current_interaction_box_id {
-                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                            if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                                if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
-                                    if game_state.current_message_index + 1 < interacting_box.messages.len() {
-                                        game_state.current_message_index += 1;
-                                        game_state.message = interacting_box.messages[game_state.current_message_index].clone();
-                                        game_state.show_message = true;
-                                        game_state.message_animation_start_time = Instant::now();
-                                        game_state.animated_message_content.clear();
-                                        game_state.message_animation_finished = false;
-                                    } else {
-                                        for event in &interacting_box.events {
-                                            match event {
-                                                crate::game::map::Event::TeleportPlayer { x, y, map_row, map_col } => {
-                                                    teleport_target = Some((*x as u16, *y as u16, *map_row, *map_col));
-                                                    break;
-                                                }
-                                            }
+                        if game_state.is_confirming_select_box {
+                            game_state.is_confirming_select_box = false;
+                            game_state.is_text_input_active = true;
+                            game_state.text_input_buffer.clear();
+                            game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
+                            game_state.show_message = true;
+                            game_state.message_animation_start_time = Instant::now();
+                            game_state.animated_message_content.clear();
+                            game_state.dismiss_message(); // Dismiss the "Select box confirmed" message
+                            game_state.block_player_movement_on_message = true; // Block movement again
+                        } else {
+                            if let Some(box_id) = game_state.current_interaction_box_id {
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                    if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                        // If this is a new interaction, or we've cycled through all messages, reset index
+                                        if game_state.current_interaction_box_id != Some(interacting_box.id) {
+                                            game_state.current_message_index = 0;
+                                        }
+
+                                        if game_state.current_message_index < interacting_box.messages.len() {
+                                            game_state.message = interacting_box.messages[game_state.current_message_index].clone();
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.animated_message_content.clear();
+                                            game_state.message_animation_finished = false;
+                                            game_state.current_message_index += 1; // Increment for next time
+                                        } else {
+                                            let events_to_process: Vec<crate::game::map::Event> = interacting_box.events.clone();
+
+                                            // All messages displayed, dismiss and trigger events
+                                            game_state.dismiss_message();
+                                            game_state.current_interaction_box_id = None; // Clear interaction
+                                            game_state.current_message_index = 0; // Reset for future interactions
+
+                                            teleport_target = events_to_process.iter().find_map(|event| {
+                                                let crate::game::map::Event::TeleportPlayer { x, y, map_row, map_col } = event;
+                                                Some((*x as u16, *y as u16, *map_row, *map_col))
+                                            });
                                         }
                                     }
                                 }
                             }
-                        }
-                        game_state.dismiss_message();
-                        if let Some((x, y, map_row, map_col)) = teleport_target {
-                            game_state.player.x = x;
-                            game_state.player.y = y;
-                            game_state.current_map_row = map_row;
-                            game_state.current_map_col = map_col;
-                            let new_map_key = (map_row, map_col);
-                            if !game_state.loaded_maps.contains_key(&new_map_key) {
-                                let new_map_name = format!("map_{}_{}", map_row, map_col);
-                                if let Ok(new_map) = crate::game::map::Map::load(&new_map_name) {
-                                    game_state.loaded_maps.insert(new_map_key, new_map);
-                                } else {
-                                    game_state.message = format!("Failed to load map: {}", new_map_name);
-                                    game_state.show_message = true;
-                                    game_state.message_animation_start_time = Instant::now();
-                                    game_state.animated_message_content.clear();
+                            if let Some((x, y, map_row, map_col)) = teleport_target {
+                                game_state.player.x = x;
+                                game_state.player.y = y;
+                                game_state.current_map_row = map_row;
+                                game_state.current_map_col = map_col;
+                                let new_map_key = (map_row, map_col);
+                                if !game_state.loaded_maps.contains_key(&new_map_key) {
+                                    let new_map_name = format!("map_{}_{}", map_row, map_col);
+                                    if let Ok(new_map) = crate::game::map::Map::load(&new_map_name) {
+                                        game_state.loaded_maps.insert(new_map_key, new_map);
+                                    } else {
+                                        game_state.message = format!("Failed to load map: {}", new_map_name);
+                                        game_state.show_message = true;
+                                        game_state.message_animation_start_time = Instant::now();
+                                        game_state.animated_message_content.clear();
+                                    }
                                 }
+                                game_state.current_map_name = format!("map_{}_{}", map_row, map_col);
                             }
-                            game_state.current_map_name = format!("map_{}_{}", map_row, map_col);
+                            game_state.dismiss_message();
                         }
                     } else {
                         game_state.skip_message_animation();
@@ -195,10 +217,7 @@ pub fn process_events(
                     game_state.skip_message_animation();
                 }
 
-                if !(game_state.is_drawing_select_box) {
-                    continue;
                 }
-            }
 
             match key.kind {
                 event::KeyEventKind::Press => {
@@ -239,28 +258,37 @@ pub fn process_events(
                         ];
                         let current_map_key = (game_state.current_map_row, game_state.current_map_col);
                         if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                            'outer: for select_box in &current_map.select_object_boxes {
-                                let line_points = utils::get_line_points(
-                                    select_box.x1 as i32,
-                                    select_box.y1 as i32,
-                                    select_box.x2 as i32,
-                                    select_box.y2 as i32,
-                                );
-                                for point in line_points {
-                                    for interaction_box in &interaction_boxes {
-                                        if interaction_box.contains(ratatui::layout::Position::new(point.0 as u16, point.1 as u16)) {
-                                            if !select_box.messages.is_empty() {
-                                                game_state.message = select_box.messages[0].clone();
+                            if let Some(found_box) = current_map.select_object_boxes.iter().find(|b| {
+                                let select_box_rect = b.to_rect();
+                                interaction_boxes.iter().any(|interaction_box| interaction_box.intersects(select_box_rect))
+                            }) {
+                                        if !found_box.messages.is_empty() {
+                                            // If this is a new interaction, or we've cycled through all messages, reset index
+                                            if game_state.current_interaction_box_id != Some(found_box.id) {
+                                                game_state.current_message_index = 0;
+                                            }
+
+                                            if game_state.current_message_index < found_box.messages.len() {
+                                                game_state.message = found_box.messages[game_state.current_message_index].clone();
                                                 game_state.show_message = true;
                                                 game_state.message_animation_start_time = Instant::now();
                                                 game_state.animated_message_content.clear();
-                                                game_state.current_interaction_box_id = Some(select_box.id);
-                                                game_state.current_message_index = 0;
-                                                break 'outer;
+                                                game_state.message_animation_finished = false;
+                                                game_state.current_message_index += 1; // Increment for next time
+                                            } else {
+                                                let events_to_process: Vec<crate::game::map::Event> = found_box.events.clone();
+
+                                                // All messages displayed, dismiss and trigger events
+                                                game_state.dismiss_message();
+                                                game_state.current_interaction_box_id = None; // Clear interaction
+                                                game_state.current_message_index = 0; // Reset for future interactions
+
+                                                teleport_target = events_to_process.iter().find_map(|event| {
+                                                    let crate::game::map::Event::TeleportPlayer { x, y, map_row, map_col } = event;
+                                                    Some((*x as u16, *y as u16, *map_row, *map_col))
+                                                });
                                             }
                                         }
-                                    }
-                                }
                             }
                         }
                     } else if key.code == KeyCode::Char('q') {

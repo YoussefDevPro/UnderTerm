@@ -24,6 +24,19 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             game_state.message_animation_start_time = Instant::now();
             game_state.animated_message_content.clear();
         }
+        KeyCode::Char('o') => {
+            if !game_state.is_drawing_select_box {
+                game_state.is_drawing_select_box = true;
+                game_state.select_box_start_coords = Some((game_state.player.x, game_state.player.y));
+                game_state.message = "Drawing select box: Move player to set end point, then press Enter.".to_string();
+                game_state.block_player_movement_on_message = false; // Allow movement
+            } else {
+                game_state.message = "Finish drawing select box by pressing Enter.".to_string();
+            }
+            game_state.show_message = true;
+            game_state.message_animation_start_time = Instant::now();
+            game_state.animated_message_content.clear();
+        }
         
         KeyCode::F(3) => {
             game_state.is_creating_map = true;
@@ -43,24 +56,22 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                         let new_id = map_to_modify.select_object_boxes.iter().map(|b| b.id).max().unwrap_or(0) + 1;
                         let new_select_box = crate::game::map::SelectObjectBox {
                             id: new_id,
-                            x1: start_x as u32,
-                            y1: start_y as u32,
-                            x2: end_x as u32,
-                            y2: end_y as u32,
+                            x: start_x.min(end_x) as u32,
+                            y: start_y.min(end_y) as u32,
+                            width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
+                            height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
                             messages: Vec::new(),
                             events: Vec::new(),
                         };
                         game_state.pending_select_box = Some(new_select_box);
-                        game_state.is_text_input_active = true;
-                        game_state.text_input_buffer.clear();
-                        game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
+                        game_state.message = "Select box confirmed. Press Enter again to add messages, or Esc to cancel.".to_string();
                         game_state.show_message = true;
                         game_state.message_animation_start_time = Instant::now();
                         game_state.animated_message_content.clear();
                     }
                 }
-                game_state.is_drawing_select_box = false;
                 game_state.select_box_start_coords = None;
+                game_state.is_confirming_select_box = true;
             }
             
         }

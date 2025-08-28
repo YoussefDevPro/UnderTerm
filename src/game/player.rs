@@ -60,6 +60,7 @@ pub struct PlayerUpdateContext<'a> {
     pub history_index: &'a mut usize,
     pub current_map_name: &'a mut String,
     pub is_drawing_select_box: bool, // Added
+    pub block_player_movement_on_message: &'a mut bool, // New field
     
 }
 
