@@ -1,7 +1,7 @@
+use crate::game::state::TeleportZone;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use crate::game::state::TeleportZone;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum MapKind {
@@ -12,6 +12,24 @@ pub enum MapKind {
     #[serde(rename = "empty")]
     Empty,
     // Add more kinds as needed
+}
+
+impl MapKind {
+    pub fn next(&self) -> Self {
+        match self {
+            MapKind::Walls => MapKind::Objects,
+            MapKind::Objects => MapKind::Empty,
+            MapKind::Empty => MapKind::Walls,
+        }
+    }
+
+    pub fn previous(&self) -> Self {
+        match self {
+            MapKind::Walls => MapKind::Empty,
+            MapKind::Objects => MapKind::Walls,
+            MapKind::Empty => MapKind::Objects,
+        }
+    }
 }
 
 impl Default for MapKind {
@@ -35,7 +53,12 @@ pub struct MapData {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Event {
-    TeleportPlayer { x: u32, y: u32, map_row: i32, map_col: i32 },
+    TeleportPlayer {
+        x: u32,
+        y: u32,
+        map_row: i32,
+        map_col: i32,
+    },
     // Add more event types as needed
 }
 
@@ -60,7 +83,7 @@ pub struct Map {
     pub walls: Vec<(u32, u32)>,
     pub player_spawn: (u32, u32),
     pub select_object_boxes: Vec<SelectObjectBox>, // Added
-    pub kind: MapKind, // Added
+    pub kind: MapKind,                             // Added
     pub teleport_zones: Vec<TeleportZone>,
     pub width: u16,
     pub height: u16,
@@ -116,10 +139,8 @@ impl Map {
     pub fn toggle_wall(&mut self, x: u32, y: u32) {
         let pos = (x, y);
         if let Some(index) = self.walls.iter().position(|&p| p == pos) {
-            // Wall exists, remove it
             self.walls.remove(index);
         } else {
-            // Wall does not exist, add it
             self.walls.push(pos);
         }
     }
@@ -132,8 +153,8 @@ impl Map {
             map_name: self.name.clone(),
             player_spawn: self.player_spawn,
             walls: self.walls.clone(),
-            select_object_boxes: self.select_object_boxes.clone(), // Added
-            kind: self.kind.clone(), // Add this line
+            select_object_boxes: self.select_object_boxes.clone(),
+            kind: self.kind.clone(),
             teleport_zones: self.teleport_zones.clone(),
         };
 
