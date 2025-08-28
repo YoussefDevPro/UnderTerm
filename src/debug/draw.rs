@@ -1,5 +1,5 @@
 use crate::game::config::ANIMATION_FRAME_DURATION;
-use crate::game::state::GameState;
+use crate::game::state::{GameState, TeleportCreationState};
 
 
 use ratatui::{
@@ -154,6 +154,52 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                 );
                 frame.render_widget(select_box_paragraph, clamped_rect);
             }
+        }
+    }
+
+    // Draw pending select box or teleport line
+    if (game_state.is_drawing_select_box || game_state.teleport_creation_state == TeleportCreationState::DrawingBox) && game_state.select_box_start_coords.is_some() {
+        if let Some((start_x, start_y)) = game_state.select_box_start_coords {
+            let (end_x, end_y) = (game_state.player.x, game_state.player.y);
+
+            let rect_x = start_x.min(end_x);
+            let rect_y = start_y.min(end_y);
+            let rect_width = start_x.max(end_x).saturating_sub(rect_x).saturating_add(1);
+            let rect_height = start_y.max(end_y).saturating_sub(rect_y).saturating_add(1);
+
+            let draw_x = rect_x.saturating_sub(game_state.camera_x);
+            let draw_y = rect_y.saturating_sub(game_state.camera_y);
+
+            let draw_rect = Rect::new(draw_x, draw_y, rect_width, rect_height);
+            let clamped_rect = draw_rect.intersection(size);
+
+            if !clamped_rect.is_empty() {
+                let color = if game_state.teleport_creation_state == TeleportCreationState::DrawingBox { Color::Magenta } else { Color::Green };
+                let pending_box_paragraph = Paragraph::new("").block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(color)),
+                );
+                frame.render_widget(pending_box_paragraph, clamped_rect);
+            }
+        }
+    }
+
+    // Draw visual X, Y selector when selecting coordinates
+    if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates {
+        let draw_x = game_state.player.x.saturating_sub(game_state.camera_x);
+        let draw_y = game_state.player.y.saturating_sub(game_state.camera_y);
+
+        let draw_rect = Rect::new(draw_x, draw_y, 1, 1); // A 1x1 box at player's position
+        let clamped_rect = draw_rect.intersection(size);
+
+        if !clamped_rect.is_empty() {
+            let selector_paragraph = Paragraph::new("X").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Yellow)),
+            );
+            frame.render_widget(selector_paragraph, clamped_rect);
         }
     }
 

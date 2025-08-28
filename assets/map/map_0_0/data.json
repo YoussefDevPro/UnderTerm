@@ -1,8 +1,8 @@
 {
   "map_name": "map_0_0",
   "player_spawn": [
-    10,
-    10
+    71,
+    17
   ],
   "walls": [],
   "select_object_boxes": [
@@ -17,6 +17,89 @@
         "useless as always..."
       ],
       "events": []
+    },
+    {
+      "id": 2,
+      "x": 0,
+      "y": 0,
+      "width": 2,
+      "height": 2,
+      "messages": [
+        "E"
+      ],
+      "events": []
+    },
+    {
+      "id": 3,
+      "x": 2,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 2,
+            "y": 1,
+            "map_row": 1,
+            "map_col": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "x": 13,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 40,
+            "y": 1,
+            "map_row": 1,
+            "map_col": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "x": 27,
+      "y": 21,
+      "width": 1,
+      "height": 1,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 27,
+            "y": 20,
+            "map_row": 1,
+            "map_col": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "x": 52,
+      "y": 2,
+      "width": 1,
+      "height": 1,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 52,
+            "y": 3,
+            "map_row": 1,
+            "map_col": 2
+          }
+        }
+      ]
     }
   ],
   "kind": "empty"

@@ -21,6 +21,14 @@ use ansi_to_tui::IntoText;
 
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TeleportCreationState {
+    None,
+    DrawingBox,
+    EnteringMapName,
+    SelectingCoordinates,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub player: Player,
@@ -61,7 +69,14 @@ pub struct GameState {
     #[serde(skip)]
     pub history_index: usize,
     pub is_creating_map: bool,
-    pub is_teleport_input_active: bool, // Added
+    pub last_teleport_origin: Option<(u32, u32, i32, i32)>, // Added: (x, y, map_row, map_col)
+    pub recently_teleported_from_box_id: Option<u32>, // Added
+    pub teleport_creation_state: TeleportCreationState, // New enum for teleport creation flow
+    pub teleport_destination_map_name_buffer: String, // Added
+    pub teleport_destination_x: u16, // Added
+    pub teleport_destination_y: u16, // Added
+    #[serde(skip)]
+    pub esc_press_start_time: Option<Instant>, // Added
     
 }
 
@@ -78,7 +93,7 @@ impl GameState {
         let mut loaded_maps = HashMap::new();
         loaded_maps.insert((current_map_row, current_map_col), map.clone()); // Clone map here
 
-        GameState {
+                GameState {
             player: Player::new(player_spawn_x as u16, player_spawn_y as u16),
             camera_x: 0,
             camera_y: 0,
@@ -110,12 +125,31 @@ impl GameState {
             wall_history: vec![map.walls.clone()], // Initialize with current map walls
             history_index: 0,
             is_creating_map: false,
-            is_teleport_input_active: false, // Initialize
-            
+            last_teleport_origin: None, // Initialize
+            recently_teleported_from_box_id: None, // Initialize
+            teleport_destination_map_name_buffer: String::new(), // Initialize
+            teleport_destination_x: 0, // Initialize
+            teleport_destination_y: 0, // Initialize
+            teleport_creation_state: TeleportCreationState::None, // Initialize
+            esc_press_start_time: None, // Initialize
+
         }
     }
 
-    pub fn save_game_state(&self) -> io::Result<()> {
+    pub fn save_game_state(&mut self) -> io::Result<()> { // Changed to &mut self
+        // Update player spawn point to current position before saving
+        let current_map_key = (self.current_map_row, self.current_map_col);
+        if let Some(map_to_modify) = self.loaded_maps.get_mut(&current_map_key) {
+            map_to_modify.player_spawn = (self.player.x as u32, self.player.y as u32);
+            if let Err(e) = map_to_modify.save_data() {
+                self.message = format!("Failed to save map data: {}", e);
+                self.show_message = true;
+                self.message_animation_start_time = Instant::now();
+                self.animated_message_content.clear();
+                self.message_animation_finished = false; // Reset
+            }
+        }
+
         let save_data = SaveData {
             current_map_name: self.current_map_name.clone(),
         };
@@ -136,7 +170,7 @@ impl GameState {
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 let map = Map::load("map_0_0")
                     .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to load default map: {}", e)))?;
-                let default_state = GameState::from_map(map);
+                let mut default_state = GameState::from_map(map);
                 default_state.save_game_state()?;
                 Ok(default_state)
             }
@@ -188,6 +222,26 @@ impl GameState {
         // Prevent player movement if a message is being displayed and movement is blocked
         if !(*context.show_message && *context.block_player_movement_on_message) {
             self.player.update(&mut context, key_states, animation_frame_duration);
+
+            // Anti-looping: Clear recently_teleported_from_box_id if player moves out of the box
+            if let Some(teleported_from_id) = self.recently_teleported_from_box_id {
+                let current_map_key = (self.current_map_row, self.current_map_col);
+                if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
+                    if let Some(teleport_box) = current_map.select_object_boxes.iter().find(|b| b.id == teleported_from_id) {
+                        let player_rect = ratatui::layout::Rect::new(self.player.x, self.player.y, 1, 1); // Assuming player is 1x1
+                        if !teleport_box.to_rect().intersects(player_rect) {
+                            // Player has moved out of the box
+                            self.recently_teleported_from_box_id = None;
+                        }
+                    } else {
+                        // Box not found, clear the flag to prevent issues
+                        self.recently_teleported_from_box_id = None;
+                    }
+                } else {
+                    // Map not loaded, clear the flag to prevent issues
+                    self.recently_teleported_from_box_id = None;
+                }
+            }
         }
 
         // Re-implement continuous camera logic

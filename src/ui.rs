@@ -1,5 +1,5 @@
 use crate::debug;
-use crate::game::state::GameState;
+use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
 
 use ratatui::{
@@ -212,8 +212,10 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     if game_state.is_text_input_active {
         let title = if game_state.is_creating_map {
             "Enter New Map Name"
-        } else if game_state.is_teleport_input_active {
-            "Enter Target Map ID"
+        } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+            "Enter Target Map Name"
+        } else if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates {
+            "Select Target Coordinates"
         } else {
             "Enter Message"
         };

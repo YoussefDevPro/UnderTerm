@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use crate::game::state::GameState;
+use crate::game::state::{GameState, TeleportCreationState};
 use std::time::Instant;
 
 pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
@@ -47,6 +47,19 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             game_state.message_animation_start_time = Instant::now();
             game_state.animated_message_content.clear();
         }
+        KeyCode::Char('t') => {
+            if game_state.teleport_creation_state == TeleportCreationState::None {
+                game_state.teleport_creation_state = TeleportCreationState::DrawingBox;
+                game_state.select_box_start_coords = Some((game_state.player.x, game_state.player.y));
+                game_state.message = "Drawing teleport line: Move player to set end point, then press Enter.".to_string();
+                game_state.block_player_movement_on_message = false; // Allow movement
+            } else if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
+                game_state.message = "Finish drawing teleport line by pressing Enter.".to_string();
+            }
+            game_state.show_message = true;
+            game_state.message_animation_start_time = Instant::now();
+            game_state.animated_message_content.clear();
+        }
         KeyCode::Enter => {
             if game_state.is_drawing_select_box {
                 if let Some((start_x, start_y)) = game_state.select_box_start_coords {
@@ -72,6 +85,29 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                 }
                 game_state.select_box_start_coords = None;
                 game_state.is_confirming_select_box = true;
+            } else if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
+                if let Some((start_x, start_y)) = game_state.select_box_start_coords {
+                    let (end_x, end_y) = (game_state.player.x, game_state.player.y);
+                    let new_id = game_state.loaded_maps.get(&(game_state.current_map_row, game_state.current_map_col))
+                        .map_or(0, |m| m.select_object_boxes.iter().map(|b| b.id).max().unwrap_or(0) + 1);
+                    let new_teleport_box = crate::game::map::SelectObjectBox {
+                        id: new_id,
+                        x: start_x.min(end_x) as u32,
+                        y: start_y.min(end_y) as u32,
+                        width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
+                        height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
+                        messages: Vec::new(),
+                        events: Vec::new(), // Events will be added in the next step
+                    };
+                    game_state.pending_select_box = Some(new_teleport_box);
+                    game_state.teleport_creation_state = TeleportCreationState::EnteringMapName;
+                    game_state.is_text_input_active = true;
+                    game_state.teleport_destination_map_name_buffer.clear();
+                    game_state.message = "Enter target map name (e.g., map_0_0):".to_string();
+                    game_state.show_message = true;
+                    game_state.message_animation_start_time = Instant::now();
+                    game_state.animated_message_content.clear();
+                }
             }
             
         }
