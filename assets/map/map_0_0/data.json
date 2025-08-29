@@ -3912,76 +3912,39 @@
     [
       119,
       19
+    ],
+    [
+      334,
+      43
     ]
   ],
   "select_object_boxes": [
     {
       "id": 1,
-      "x": 80,
-      "y": 40,
-      "width": 38,
-      "height": 12,
-      "messages": [
-        "its just flowers...",
-        "useless as always..."
-      ],
-      "events": []
-    },
-    {
-      "id": 2,
-      "x": 0,
-      "y": 0,
-      "width": 2,
-      "height": 2,
-      "messages": [
-        "E"
-      ],
-      "events": []
-    },
-    {
-      "id": 7,
-      "x": 89,
-      "y": 1,
-      "width": 26,
-      "height": 2,
-      "messages": [],
-      "events": []
-    },
-    {
-      "id": 8,
-      "x": 249,
-      "y": 34,
-      "width": 21,
-      "height": 2,
-      "messages": [],
-      "events": [
-        {
-          "TeleportPlayer": {
-            "x": 269,
-            "y": 35,
-            "map_row": 1,
-            "map_col": 2
-          }
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "x": 395,
-      "y": 49,
-      "width": 27,
-      "height": 3,
-      "messages": [],
-      "events": []
-    },
-    {
-      "id": 10,
       "x": 395,
       "y": 49,
       "width": 27,
       "height": 4,
       "messages": [],
       "events": []
+    },
+    {
+      "id": 2,
+      "x": 395,
+      "y": 49,
+      "width": 27,
+      "height": 4,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 421,
+            "y": 52,
+            "map_row": 1,
+            "map_col": 2
+          }
+        }
+      ]
     }
   ],
   "kind": "empty"

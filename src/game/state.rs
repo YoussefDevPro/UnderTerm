@@ -1,5 +1,6 @@
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
+use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
 use ratatui::layout::Rect;
 use ratatui::text::Text;
@@ -7,22 +8,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
 use std::time::{Duration, Instant};
-use ansi_to_tui::IntoText;
 
 fn default_instant() -> Instant {
     Instant::now()
 }
 
 fn default_duration() -> Duration {
-    Duration::from_millis(50) // Default animation speed
+    Duration::from_millis(50)
 }
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TeleportCreationState {
     None,
     DrawingBox,
     EnteringMapName,
-    SelectingCoordinates,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,25 +36,23 @@ pub struct GameState {
     #[serde(skip, default = "default_duration")]
     pub message_animation_speed: Duration,
     #[serde(skip)]
-    pub message_animation_finished: bool, // Added
-    pub show_debug_panel: bool,      // Added this line
-    pub sound_error: Option<String>, // New field for sound errors
+    pub message_animation_finished: bool,
+    pub sound_error: Option<String>,
     #[serde(skip)]
     pub loaded_maps: std::collections::HashMap<(i32, i32), Map>,
     pub debug_mode: bool,
-    pub show_collision_box: bool,                    // Added
-    pub current_interaction_box_id: Option<u32>,     // Added
-    pub current_message_index: usize,                // Added
-    pub is_drawing_select_box: bool,                 // Added
-    pub select_box_start_coords: Option<(u16, u16)>, // Added
-    pub is_confirming_select_box: bool,              // New field
-    pub block_player_movement_on_message: bool,      // New field
-
-    pub is_text_input_active: bool, // Added
-    pub text_input_buffer: String,  // Added
-    pub pending_select_box: Option<crate::game::map::SelectObjectBox>, // Added
-    pub is_event_input_active: bool, // Added
-    pub is_map_kind_selection_active: bool, // Added
+    pub show_collision_box: bool,
+    pub current_interaction_box_id: Option<u32>,
+    pub current_message_index: usize,
+    pub is_drawing_select_box: bool,
+    pub select_box_start_coords: Option<(u16, u16)>,
+    pub is_confirming_select_box: bool,
+    pub block_player_movement_on_message: bool,
+    pub is_text_input_active: bool,
+    pub text_input_buffer: String,
+    pub pending_select_box: Option<crate::game::map::SelectObjectBox>,
+    pub is_event_input_active: bool,
+    pub is_map_kind_selection_active: bool,
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -65,18 +61,17 @@ pub struct GameState {
     #[serde(skip)]
     pub history_index: usize,
     pub is_creating_map: bool,
-    pub last_teleport_origin: Option<(u32, u32, i32, i32)>, // Added: (x, y, map_row, map_col)
-    pub recently_teleported_from_box_id: Option<u32>,       // Added
-    pub teleport_creation_state: TeleportCreationState,     // New enum for teleport creation flow
-    pub teleport_destination_map_name_buffer: String,       // Added
+    pub last_teleport_origin: Option<(u32, u32, i32, i32)>,
+    pub recently_teleported_from_box_id: Option<u32>,
+    pub teleport_creation_state: TeleportCreationState,
+    pub teleport_destination_map_name_buffer: String,
 
     #[serde(skip)]
-    pub esc_press_start_time: Option<Instant>, // Added
+    pub esc_press_start_time: Option<Instant>,
     #[serde(skip)]
     pub debug_info: Vec<String>,
 }
 
-// A helper struct for saving the game state
 #[derive(Serialize, Deserialize)]
 struct SaveData {
     current_map_name: String,
@@ -87,14 +82,12 @@ impl GameState {
         let player_spawn_x = map.player_spawn.0;
         let player_spawn_y = map.player_spawn.1;
 
-        // Parse row and col from map.name
         let map_parts: Vec<&str> = map.name.split('_').collect();
         let current_map_row: i32 = map_parts[1].parse().unwrap_or(0);
         let current_map_col: i32 = map_parts[2].parse().unwrap_or(0);
 
         let mut loaded_maps = HashMap::new();
-        loaded_maps.insert((current_map_row, current_map_col), map.clone()); // Clone map here
-
+        loaded_maps.insert((current_map_row, current_map_col), map.clone());
         GameState {
             player: Player::new(player_spawn_x as u16, player_spawn_y as u16),
             camera_x: 0,
@@ -103,36 +96,35 @@ impl GameState {
             show_message: false,
             animated_message_content: String::new(),
             message_animation_start_time: Instant::now(),
-            message_animation_speed: Duration::from_millis(50), // Default speed
-            message_animation_finished: false,                  // Initialize
+            message_animation_speed: Duration::from_millis(50),
+            message_animation_finished: false,
             current_map_name: format!("map_{}_{}", current_map_row, current_map_col),
             loaded_maps,
             debug_mode: false,
-            show_debug_panel: false,                // Added this line
-            show_collision_box: false,              // Initialize
-            current_interaction_box_id: None,       // Initialize
-            current_message_index: 0,               // Initialize
-            is_drawing_select_box: false,           // Initialize
-            select_box_start_coords: None,          // Initialize
-            is_confirming_select_box: false,        // Initialize
-            block_player_movement_on_message: true, // Initialize
-            is_text_input_active: false,            // Initialize
-            text_input_buffer: String::new(),       // Initialize
-            pending_select_box: None,               // Initialize
-            is_event_input_active: false,           // Initialize
-            is_map_kind_selection_active: false,    // Initialize
-            sound_error: None,                      // Initialize sound_error
+            show_collision_box: false,
+            current_interaction_box_id: None,
+            current_message_index: 0,
+            is_drawing_select_box: false,
+            select_box_start_coords: None,
+            is_confirming_select_box: false,
+            block_player_movement_on_message: true,
+            is_text_input_active: false,
+            text_input_buffer: String::new(),
+            pending_select_box: None,
+            is_event_input_active: false,
+            is_map_kind_selection_active: false,
+            sound_error: None,
             current_map_row,
             current_map_col,
-            wall_history: vec![map.walls.clone()], // Initialize with current map walls
+            wall_history: vec![map.walls.clone()],
             history_index: 0,
             is_creating_map: false,
-            last_teleport_origin: None,            // Initialize
-            recently_teleported_from_box_id: None, // Initialize
-            teleport_destination_map_name_buffer: String::new(), // Initialize
+            last_teleport_origin: None,
+            recently_teleported_from_box_id: None,
+            teleport_destination_map_name_buffer: String::new(),
 
-            teleport_creation_state: TeleportCreationState::None, // Initialize
-            esc_press_start_time: None,                           // Initialize
+            teleport_creation_state: TeleportCreationState::None,
+            esc_press_start_time: None,
             debug_info: Vec::new(),
         }
     }
@@ -153,7 +145,7 @@ impl GameState {
                 let map = Map::load(&deserialized.current_map_name).map_err(|e| {
                     io::Error::new(io::ErrorKind::Other, format!("Failed to load map: {}", e))
                 })?;
-                let game_state = GameState::from_map(map); // Player will be initialized at map's spawn
+                let game_state = GameState::from_map(map);
                 Ok(game_state)
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
@@ -185,7 +177,9 @@ impl GameState {
         frame_size: ratatui::layout::Rect,
         animation_frame_duration: std::time::Duration,
     ) {
-        // Dismiss message if confirming select box and player moves
+        if self.show_message && self.message.is_empty() {
+            self.dismiss_message();
+        }
         if self.is_confirming_select_box
             && (*key_states.get(&KeyCode::Up).unwrap_or(&false)
                 || *key_states.get(&KeyCode::Down).unwrap_or(&false)
@@ -195,7 +189,6 @@ impl GameState {
             self.dismiss_message();
         }
 
-        // Update animated message content
         if self.show_message {
             let elapsed = self.message_animation_start_time.elapsed();
             let chars_to_show =
@@ -205,7 +198,6 @@ impl GameState {
             self.animated_message_content.clear();
         }
 
-        // If the animation is complete, set flag
         if self.animated_message_content.len() == self.message.len() {
             self.message_animation_finished = true;
         } else {
@@ -224,16 +216,14 @@ impl GameState {
             wall_history: &mut self.wall_history,
             history_index: &mut self.history_index,
             current_map_name: &mut self.current_map_name,
-            is_drawing_select_box: self.is_drawing_select_box, // Pass the flag
-            block_player_movement_on_message: &mut self.block_player_movement_on_message, // Pass the flag
+            is_drawing_select_box: self.is_drawing_select_box,
+            block_player_movement_on_message: &mut self.block_player_movement_on_message,
         };
 
-        // Prevent player movement if a message is being displayed and movement is blocked
         if !(*context.show_message && *context.block_player_movement_on_message) {
             self.player
                 .update(&mut context, key_states, animation_frame_duration);
 
-            // Anti-looping: Clear recently_teleported_from_box_id if player moves out of the box
             if let Some(teleported_from_id) = self.recently_teleported_from_box_id {
                 let current_map_key = (self.current_map_row, self.current_map_col);
                 if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
@@ -243,25 +233,19 @@ impl GameState {
                         .find(|b| b.id == teleported_from_id)
                     {
                         let player_rect =
-                            ratatui::layout::Rect::new(self.player.x, self.player.y, 1, 1); // Assuming player is 1x1
+                            ratatui::layout::Rect::new(self.player.x, self.player.y, 1, 1);
                         if !teleport_box.to_rect().intersects(player_rect) {
-                            // Player has moved out of the box
                             self.recently_teleported_from_box_id = None;
                         }
                     } else {
-                        // Box not found, clear the flag to prevent issues
                         self.recently_teleported_from_box_id = None;
                     }
                 } else {
-                    // Map not loaded, clear the flag to prevent issues
                     self.recently_teleported_from_box_id = None;
                 }
             }
         }
 
-        // Re-implement continuous camera logic
-        // Calculate the desired camera position to center the player
-        // Consider player sprite's center for more accurate centering
         let (_player_sprite_content, player_sprite_width, player_sprite_height) =
             self.player.get_sprite_content();
 
@@ -273,20 +257,16 @@ impl GameState {
 
         let current_map_key = (self.current_map_row, self.current_map_col);
         if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
-            // Clamp camera to map boundaries
-            // Ensure camera does not go beyond the map's right/bottom edge
             new_camera_x = new_camera_x.min(current_map.width.saturating_sub(frame_size.width));
             new_camera_y = new_camera_y.min(current_map.height.saturating_sub(frame_size.height));
         }
 
-        // Ensure camera does not go below 0
         new_camera_x = new_camera_x.max(0);
         new_camera_y = new_camera_y.max(0);
 
         self.camera_x = new_camera_x;
         self.camera_y = new_camera_y;
 
-        // Check for teleport box collisions
         if !self.debug_mode {
             let player_collision_rect = self.player.get_collision_rect();
             let mut teleport_destination: Option<(u16, u16, i32, i32, String)> = None;
@@ -297,33 +277,50 @@ impl GameState {
                 for select_box in &current_map.select_object_boxes {
                     if select_box.to_rect().intersects(player_collision_rect) {
                         if self.recently_teleported_from_box_id == Some(select_box.id) {
-                            continue; // Already teleported from this box, prevent continuous teleport
+                            continue;
                         }
 
                         for event in &select_box.events {
                             match event {
-                                crate::game::map::Event::TeleportPlayer { x, y, map_row, map_col } => {
-                                    teleport_destination = Some((
-                                        *x as u16,
-                                        *y as u16,
-                                        *map_row,
-                                        *map_col,
-                                        format!("map_{}_{}", map_row, map_col),
-                                    ));
-                                    self.recently_teleported_from_box_id = Some(select_box.id);
-                                    break; // Found teleport event, break inner loop
+                                crate::game::map::Event::TeleportPlayer {
+                                    map_row,
+                                    map_col,
+                                } => {
+                                    let new_map_name = format!("map_{}_{}", map_row, map_col);
+                                    let new_map_key = (*map_row, *map_col);
+                                    if !self.loaded_maps.contains_key(&new_map_key) {
+                                        if let Ok(new_map) = crate::game::map::Map::load(&new_map_name) {
+                                            self.loaded_maps.insert(new_map_key, new_map);
+                                        } else {
+                                            self.message = format!("Failed to load map: {}", new_map_name);
+                                            self.show_message = true;
+                                            self.message_animation_start_time = Instant::now();
+                                            self.animated_message_content.clear();
+                                            break;
+                                        }
+                                    }
+                                    if let Some(new_map) = self.loaded_maps.get(&new_map_key) {
+                                        teleport_destination = Some((
+                                            new_map.player_spawn.0 as u16,
+                                            new_map.player_spawn.1 as u16,
+                                            *map_row,
+                                            *map_col,
+                                            new_map_name,
+                                        ));
+                                        self.recently_teleported_from_box_id = Some(select_box.id);
+                                    }
+                                    break;
                                 }
                             }
                         }
                         if teleport_destination.is_some() {
-                            break; // Teleported, break outer loop
+                            break;
                         }
                     }
                 }
             }
 
             if let Some((x, y, map_row, map_col, new_map_name)) = teleport_destination {
-                // Store current position as origin before teleporting
                 self.last_teleport_origin = Some((
                     self.player.x as u32,
                     self.player.y as u32,
@@ -335,30 +332,24 @@ impl GameState {
                 self.player.y = y;
                 self.current_map_row = map_row;
                 self.current_map_col = map_col;
-                let new_map_key = (map_row, map_col);
-
-                if !self.loaded_maps.contains_key(&new_map_key) {
-                    if let Ok(new_map) = crate::game::map::Map::load(&new_map_name) {
-                        self.loaded_maps.insert(new_map_key, new_map);
-                    } else {
-                        self.message = format!("Failed to load map: {}", new_map_name);
-                        self.show_message = true;
-                        self.message_animation_start_time = Instant::now();
-                        self.animated_message_content.clear();
-                    }
-                }
                 self.current_map_name = new_map_name;
             }
         }
 
-        // Update debug info
         self.debug_info.clear();
         let player_collision_rect = self.player.get_collision_rect();
-        self.debug_info.push(format!("Player Collision Box: {:?}", player_collision_rect));
-        if let Some(current_map) = self.loaded_maps.get(&(self.current_map_row, self.current_map_col)) {
+        self.debug_info
+            .push(format!("Player Collision Box: {:?}", player_collision_rect));
+        if let Some(current_map) = self
+            .loaded_maps
+            .get(&(self.current_map_row, self.current_map_col))
+        {
             for select_box in &current_map.select_object_boxes {
                 let intersects = select_box.to_rect().intersects(player_collision_rect);
-                let is_tp = select_box.events.iter().any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
+                let is_tp = select_box
+                    .events
+                    .iter()
+                    .any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
                 self.debug_info.push(format!(
                     "Box ID {}: {:?}, TP: {}, Intersects: {}",
                     select_box.id,
@@ -399,13 +390,13 @@ impl GameState {
                 self.show_message = true;
                 self.message_animation_start_time = Instant::now();
                 self.animated_message_content.clear();
-                self.message_animation_finished = false; // Reset
+                self.message_animation_finished = false;
             } else {
                 self.message = "Spawn point saved.".to_string();
                 self.show_message = true;
                 self.message_animation_start_time = Instant::now();
                 self.animated_message_content.clear();
-                self.message_animation_finished = false; // Reset
+                self.message_animation_finished = false;
             }
         }
     }

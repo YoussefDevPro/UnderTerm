@@ -4,25 +4,21 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-// Constants for player collision
 const PLAYER_COLLISION_WIDTH: u16 = 21;
-const PLAYER_COLLISION_HEIGHT: u16 = 4;
+const PLAYER_COLLISION_HEIGHT: u16 = 5;
 
-// bring in new imports
 use super::config::{PLAYER_HORIZONTAL_SPEED, PLAYER_SPEED};
 use super::map::Map;
 use crossterm::event::KeyCode;
 
-// Helper function for serde default
 fn default_instant() -> Instant {
     Instant::now()
 }
 
 fn default_walking_stop_delay() -> Duration {
-    Duration::from_millis(100) // 100ms grace period
+    Duration::from_millis(100)
 }
 
-// Enum to represent player direction
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum PlayerDirection {
     Front,
@@ -31,7 +27,6 @@ pub enum PlayerDirection {
     Right,
 }
 
-// Struct to hold player state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
     pub x: u16,
@@ -41,9 +36,9 @@ pub struct Player {
     pub is_walking: bool,
     #[serde(skip, default = "default_instant")]
     pub animation_timer: Instant,
-    #[serde(skip, default = "default_instant")] // Use default_instant for walking_stop_timer
+    #[serde(skip, default = "default_instant")]
     pub walking_stop_timer: Instant,
-    #[serde(skip, default = "default_walking_stop_delay")] // Use a new default for delay
+    #[serde(skip, default = "default_walking_stop_delay")]
     pub walking_stop_delay: Duration,
 }
 
@@ -54,14 +49,13 @@ pub struct PlayerUpdateContext<'a> {
     pub debug_mode: bool,
     pub message: &'a mut String,
     pub show_message: &'a mut bool,
-    pub animated_message_content: &'a mut String, // Added
-    pub message_animation_start_time: &'a mut Instant, // Added
+    pub animated_message_content: &'a mut String,
+    pub message_animation_start_time: &'a mut Instant,
     pub wall_history: &'a mut Vec<Vec<(u32, u32)>>,
     pub history_index: &'a mut usize,
     pub current_map_name: &'a mut String,
-    pub is_drawing_select_box: bool, // Added
-    pub block_player_movement_on_message: &'a mut bool, // New field
-    
+    pub is_drawing_select_box: bool,
+    pub block_player_movement_on_message: &'a mut bool,
 }
 
 impl Player {
@@ -69,12 +63,12 @@ impl Player {
         Player {
             x,
             y,
-            direction: PlayerDirection::Front, // Default direction
+            direction: PlayerDirection::Front,
             animation_frame: 0,
             is_walking: false,
-            animation_timer: Instant::now(), // Initialize timer
-            walking_stop_timer: Instant::now(), // Initialize
-            walking_stop_delay: Duration::from_millis(100), // Initialize
+            animation_timer: Instant::now(),
+            walking_stop_timer: Instant::now(),
+            walking_stop_delay: Duration::from_millis(100),
         }
     }
 
@@ -104,7 +98,7 @@ impl Player {
                         1 => ("walk", "frisk_walk_front_1.ans"),
                         2 => ("idle", "frisk_idle_front.ans"),
                         3 => ("walk", "frisk_walk_front_2.ans"),
-                        _ => ("idle", "frisk_idle_front.ans"), // Fallback
+                        _ => ("idle", "frisk_idle_front.ans"),
                     }
                 } else {
                     ("idle", "frisk_idle_front.ans")
@@ -117,7 +111,7 @@ impl Player {
                         1 => ("walk", "frisk_walk_back_1.ans"),
                         2 => ("idle", "frisk_idle_back.ans"),
                         3 => ("walk", "frisk_walk_back_2.ans"),
-                        _ => ("idle", "frisk_idle_back.ans"), // Fallback
+                        _ => ("idle", "frisk_idle_back.ans"),
                     }
                 } else {
                     ("idle", "frisk_idle_back.ans")
@@ -128,7 +122,7 @@ impl Player {
                     match self.animation_frame {
                         0 => ("idle", "frisk_idle_left.ans"),
                         1 => ("walk", "frisk_walk_left.ans"),
-                        _ => ("idle", "frisk_idle_left.ans"), // Fallback
+                        _ => ("idle", "frisk_idle_left.ans"),
                     }
                 } else {
                     ("idle", "frisk_idle_left.ans")
@@ -139,7 +133,7 @@ impl Player {
                     match self.animation_frame {
                         0 => ("idle", "frisk_idle_right.ans"),
                         1 => ("walk", "frisk_walk_right.ans"),
-                        _ => ("idle", "frisk_idle_right.ans"), // Fallback
+                        _ => ("idle", "frisk_idle_right.ans"),
                     }
                 } else {
                     ("idle", "frisk_idle_right.ans")
@@ -154,25 +148,31 @@ impl Player {
             if self.animation_timer.elapsed() >= animation_frame_duration {
                 match self.direction {
                     PlayerDirection::Front | PlayerDirection::Back => {
-                        self.animation_frame = (self.animation_frame + 1) % 4; // 0, 1, 2, 3
+                        self.animation_frame = (self.animation_frame + 1) % 4;
                     }
                     PlayerDirection::Left | PlayerDirection::Right => {
-                        self.animation_frame = (self.animation_frame + 1) % 2; // 0, 1
+                        self.animation_frame = (self.animation_frame + 1) % 2;
                     }
                 }
-                self.animation_timer = Instant::now(); // Reset timer
+                self.animation_timer = Instant::now();
             }
         } else {
-            self.animation_frame = 0; // reset
-            self.animation_timer = Instant::now(); // Reset timer when idle
+            self.animation_frame = 0;
+            self.animation_timer = Instant::now();
         }
     }
 
     pub fn get_collision_rect(&self) -> ratatui::layout::Rect {
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 
-        let collision_box_x = self.x.saturating_add(player_sprite_width / 2).saturating_sub(PLAYER_COLLISION_WIDTH / 2);
-        let collision_box_y = self.y.saturating_add(player_sprite_height).saturating_sub(PLAYER_COLLISION_HEIGHT);
+        let collision_box_x = self
+            .x
+            .saturating_add(player_sprite_width / 2)
+            .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
+        let collision_box_y = self
+            .y
+            .saturating_add(player_sprite_height)
+            .saturating_sub(PLAYER_COLLISION_HEIGHT);
 
         ratatui::layout::Rect::new(
             collision_box_x,
@@ -185,17 +185,16 @@ impl Player {
     pub fn update(
         &mut self,
         context: &mut PlayerUpdateContext,
-        key_states: &HashMap<KeyCode, bool>, // Changed from Vec<KeyCode>
+        key_states: &HashMap<KeyCode, bool>,
         animation_frame_duration: Duration,
     ) {
-
         let current_map_key = (*context.current_map_row, *context.current_map_col);
         let current_map = context.loaded_maps.get(&current_map_key).cloned().unwrap();
 
         let mut new_player_x = self.x;
         let mut new_player_y = self.y;
-        let original_player_x = self.x; // Store original position
-        let original_player_y = self.y; // Store original position
+        let original_player_x = self.x;
+        let original_player_y = self.y;
 
         let up = *key_states.get(&KeyCode::Up).unwrap_or(&false);
         let down = *key_states.get(&KeyCode::Down).unwrap_or(&false);
@@ -203,7 +202,11 @@ impl Player {
         let right = *key_states.get(&KeyCode::Right).unwrap_or(&false);
 
         let move_speed = if context.debug_mode { 1 } else { PLAYER_SPEED };
-        let horizontal_move_speed = if context.debug_mode { 1 } else { PLAYER_HORIZONTAL_SPEED };
+        let horizontal_move_speed = if context.debug_mode {
+            1
+        } else {
+            PLAYER_HORIZONTAL_SPEED
+        };
 
         if up && !down {
             new_player_y = new_player_y.saturating_sub(move_speed);
@@ -243,76 +246,84 @@ impl Player {
             }
         }
 
-        let mut transitioned = false;
-        let mut next_map_row = *context.current_map_row;
-        let mut next_map_col = *context.current_map_col;
-
-        if new_player_x >= current_map.width {
-            next_map_col += 1;
-            new_player_x = 0;
-            transitioned = true;
-        } else if self.x == 0 && left {
-            if *context.current_map_col > 0 {
-                next_map_col -= 1;
-                new_player_x = current_map.width - 1;
-                transitioned = true;
-            } else {
-                new_player_x = 0;
-            }
-        }
-
-        if new_player_y >= current_map.height {
-            next_map_row += 1;
-            new_player_y = 0;
-            transitioned = true;
-        } else if self.y == 0 && up {
-            if *context.current_map_row > 0 {
-                next_map_row -= 1;
-                new_player_y = current_map.height - 1;
-                transitioned = true;
-            } else {
-                new_player_y = 0;
-            }
-        }
-
-        if transitioned {
-            let new_map_name = format!("map_{}_{}", next_map_row, next_map_col);
-            let new_map_key = (next_map_row, next_map_col);
-
-            if !context.loaded_maps.contains_key(&new_map_key) {
-                match Map::load(&new_map_name) {
-                    Ok(new_map) => {
-                        context.loaded_maps.insert(new_map_key, new_map);
-                    }
-                    Err(e) => {
-                        *context.message = format!("Cannot enter {}: {}", new_map_name, e);
-                        *context.show_message = true;
-                        *context.message_animation_start_time = Instant::now();
-                        context.animated_message_content.clear();
-                        self.x = original_player_x;
-                        self.y = original_player_y;
-                        return;
-                    }
-                }
-            }
-            *context.current_map_name = new_map_name;
-            *context.current_map_row = next_map_row;
-            *context.current_map_col = next_map_col;
-            self.x = new_player_x;
-            self.y = new_player_y;
-            *context.message = format!("Entered {}", *context.current_map_name);
-            *context.show_message = true;
-            *context.message_animation_start_time = Instant::now();
-            context.animated_message_content.clear();
-        }
+        // let mut transitioned = false;
+        // let mut next_map_row = *context.current_map_row;
+        // let mut next_map_col = *context.current_map_col;
+        // if new_player_x >= current_map.width {
+        //     next_map_col += 1;
+        //     new_player_x = 0;
+        //     transitioned = true;
+        // } else if self.x == 0 && left {
+        //     if *context.current_map_col > 0 {
+        //         next_map_col -= 1;
+        //         new_player_x = current_map.width - 1;
+        //         transitioned = true;
+        //     } else {
+        //         new_player_x = 0;
+        //     }
+        // if new_player_y >= current_map.height {
+        //     next_map_row += 1;
+        //     new_player_y = 0;
+        //     transitioned = true;
+        // } else if self.y == 0 && up {
+        //     if *context.current_map_row > 0 {
+        //         next_map_row -= 1;
+        //         new_player_y = current_map.height - 1;
+        //         transitioned = true;
+        //     } else {
+        //         new_player_y = 0;
+        //     }
+        // }
+        // if transitioned {
+        //     let new_map_name = format!("map_{}_{}", next_map_row, next_map_col);
+        //     let new_map_key = (next_map_row, next_map_col);
+        //     let map_path = std::path::Path::new("assets/map").join(&new_map_name).join("data.json");
+        //     if !map_path.exists() {
+        //         *context.message = format!("Cannot enter {}", new_map_name);
+        //         *context.show_message = true;
+        //         *context.message_animation_start_time = Instant::now();
+        //         context.animated_message_content.clear();
+        //         self.x = original_player_x;
+        //         self.y = original_player_y;
+        //         return;
+        //     }
+        //     if !context.loaded_maps.contains_key(&new_map_key) {
+        //         match Map::load(&new_map_name) {
+        //             Ok(new_map) => {
+        //                 context.loaded_maps.insert(new_map_key, new_map);
+        //             }
+        //             Err(e) => {
+        //                 *context.message = format!("Cannot enter {}: {}", new_map_name, e);
+        //                 *context.show_message = true;
+        //                 *context.message_animation_start_time = Instant::now();
+        //                 context.animated_message_content.clear();
+        //                 self.x = original_player_x;
+        //                 self.y = original_player_y;
+        //                 return;
+        //             }
+        //         }
+        //     }
+        //     *context.current_map_name = new_map_name;
+        //     *context.current_map_row = next_map_row;
+        //     *context.current_map_col = next_map_col;
+        //     self.x = new_player_x;
+        //     self.y = new_player_y;
+        //     *context.message = format!("Entered {}", *context.current_map_name);
+        //     *context.show_message = true;
+        //     *context.message_animation_start_time = Instant::now();
+        //     context.animated_message_content.clear();
+        // }
 
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 
-        // Calculate fixed-size collision box, positioned at the bottom center of the player sprite
-        let collision_box_x = new_player_x.saturating_add(player_sprite_width / 2).saturating_sub(PLAYER_COLLISION_WIDTH / 2);
-        let collision_box_y = new_player_y.saturating_add(player_sprite_height).saturating_sub(PLAYER_COLLISION_HEIGHT);
+        let collision_box_x = new_player_x
+            .saturating_add(player_sprite_width / 2)
+            .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
+        let collision_box_y = new_player_y
+            .saturating_add(player_sprite_height)
+            .saturating_sub(PLAYER_COLLISION_HEIGHT);
 
-        if !context.debug_mode { // Only apply collision detection if not in debug mode
+        if !context.debug_mode {
             let mut collision = false;
             for y_offset in 0..PLAYER_COLLISION_HEIGHT {
                 let check_y = collision_box_y.saturating_add(y_offset);
@@ -342,21 +353,19 @@ impl Player {
                 self.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
                 self.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height));
             }
-        } else { // In debug mode, just update player position without collision
+        } else {
             self.x = new_player_x;
             self.y = new_player_y;
         }
 
-        // After all movement and clamping, check if player actually moved
         if self.x != original_player_x || self.y != original_player_y {
             if !self.is_walking {
                 self.animation_frame = 1;
                 self.animation_timer = Instant::now();
             }
             self.is_walking = true;
-            self.walking_stop_timer = Instant::now(); // Reset timer when moving
+            self.walking_stop_timer = Instant::now();
         } else {
-            // If not moving, check if grace period has passed
             if self.is_walking && self.walking_stop_timer.elapsed() >= self.walking_stop_delay {
                 self.is_walking = false;
             }

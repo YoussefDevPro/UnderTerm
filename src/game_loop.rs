@@ -11,8 +11,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use crate::{
     audio::Audio,
     game::{config::FRAME_RATE, state::GameState},
-    input,
-    ui,
+    input, ui,
 };
 
 pub fn run(
@@ -38,13 +37,18 @@ pub fn run(
             let mut key_states: HashMap<crossterm::event::KeyCode, bool> = HashMap::new();
 
             if input::process_events(&rx, game_state, &mut key_states, &audio)? {
-                return Ok(()); // Quit
+                return Ok(());
             }
 
             let current_frame_size = terminal.size()?;
             game_state.update(
                 &key_states,
-                ratatui::layout::Rect::new(0, 0, current_frame_size.width, current_frame_size.height),
+                ratatui::layout::Rect::new(
+                    0,
+                    0,
+                    current_frame_size.width,
+                    current_frame_size.height,
+                ),
                 crate::game::config::ANIMATION_FRAME_DURATION,
             );
 

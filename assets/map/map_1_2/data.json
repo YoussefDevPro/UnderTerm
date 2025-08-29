@@ -1,8 +1,8 @@
 {
   "map_name": "map_1_2",
   "player_spawn": [
-    269,
-    35
+    111,
+    75
   ],
   "walls": [],
   "select_object_boxes": [
@@ -20,6 +20,24 @@
           "TeleportPlayer": {
             "x": 15,
             "y": 15,
+            "map_row": 0,
+            "map_col": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "x": 105,
+      "y": 89,
+      "width": 30,
+      "height": 1,
+      "messages": [],
+      "events": [
+        {
+          "TeleportPlayer": {
+            "x": 134,
+            "y": 89,
             "map_row": 0,
             "map_col": 0
           }

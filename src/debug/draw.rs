@@ -2,18 +2,19 @@ use crate::game::config::ANIMATION_FRAME_DURATION;
 use crate::game::state::{GameState, TeleportCreationState};
 
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
 };
 
+// kind of complicated hehe  ദ്ദി/ᐠ｡‸｡ᐟ\
 const TOP_INTERACTION_BOX_HEIGHT: u16 = 10;
 const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 3;
-const LEFT_INTERACTION_BOX_WIDTH: u16 = 5;
-const RIGHT_INTERACTION_BOX_WIDTH: u16 = 5;
+const LEFT_INTERACTION_BOX_WIDTH: u16 = 7;
+const RIGHT_INTERACTION_BOX_WIDTH: u16 = 7;
 const COLLISION_BOX_WIDTH: u16 = 21;
-const COLLISION_BOX_HEIGHT: u16 = 4;
+const COLLISION_BOX_HEIGHT: u16 = 5;
 
 pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
     let size = frame.area();
@@ -56,9 +57,13 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Draw player collision box
+    // player collision box
     let (_, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
-    let collision_box_start_x = game_state.player.x.saturating_add(player_sprite_width / 2).saturating_sub(COLLISION_BOX_WIDTH / 2);
+    let collision_box_start_x = game_state
+        .player
+        .x
+        .saturating_add(player_sprite_width / 2)
+        .saturating_sub(COLLISION_BOX_WIDTH / 2);
     let collision_box_start_y = game_state
         .player
         .y
@@ -140,7 +145,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Render SelectObjectBoxes
+    //  select object box
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         for select_box in &current_map.select_object_boxes {
             let select_box_rect = select_box.to_rect();
@@ -166,7 +171,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Draw pending select box or teleport line
+    // draw box
     if (game_state.is_drawing_select_box
         || game_state.teleport_creation_state == TeleportCreationState::DrawingBox)
         && game_state.select_box_start_coords.is_some()
@@ -202,27 +207,9 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Draw visual X, Y selector when selecting coordinates
-    if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates {
-        let draw_x = game_state.player.x.saturating_sub(game_state.camera_x);
-        let draw_y = game_state.player.y.saturating_sub(game_state.camera_y);
+    
 
-        let draw_rect = Rect::new(draw_x, draw_y, 1, 1); // A 1x1 box at player's position
-        let clamped_rect = draw_rect.intersection(size);
-
-        if !clamped_rect.is_empty() {
-            let selector_paragraph = Paragraph::new("X").block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Yellow)),
-            );
-            frame.render_widget(selector_paragraph, clamped_rect);
-        }
-    }
-
-    if game_state.show_debug_panel {
-        draw_debug_panel(frame, game_state);
-    }
+    draw_debug_panel(frame, game_state);
 }
 
 fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
@@ -233,7 +220,7 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     let (map_width, map_height, map_kind) = game_state
         .loaded_maps
         .get(&current_map_key)
-        .map(|m| (m.width, m.height, format!( "{:?}", m.kind)))
+        .map(|m| (m.width, m.height, format!("{:?}", m.kind)))
         .unwrap_or((0, 0, "N/A".to_string()));
 
     let mut debug_text = vec![
@@ -245,8 +232,7 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         format!("Map: ({}, {})", map_width, map_height),
         format!(
             "Screen Player Pos: ({}, {})",
-            player_x_on_screen,
-            player_y_on_screen
+            player_x_on_screen, player_y_on_screen
         ),
         format!("Debug Mode: {}", game_state.debug_mode),
         format!(
@@ -258,7 +244,7 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     ];
 
     debug_text.push("".to_string());
-    debug_text.push("Interaction Zones:".to_string());
+    debug_text.push(r"Interaction Zones: (ദ്ദി/ᐠ｡‸｡ᐟ\ hard af )".to_string());
     for info in &game_state.debug_info {
         debug_text.push(info.clone());
     }

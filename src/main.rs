@@ -1,13 +1,10 @@
-use std::{
-    io::{self, stdout},
-};
+use std::io::{self, stdout};
 
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-
 mod audio;
 mod debug;
 mod game;

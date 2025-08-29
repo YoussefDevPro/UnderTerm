@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -11,7 +10,6 @@ pub enum MapKind {
     Objects,
     #[serde(rename = "empty")]
     Empty,
-    // Add more kinds as needed
 }
 
 impl MapKind {
@@ -34,7 +32,7 @@ impl MapKind {
 
 impl Default for MapKind {
     fn default() -> Self {
-        MapKind::Walls // Default to Walls if not specified
+        MapKind::Walls
     }
 }
 
@@ -45,20 +43,16 @@ pub struct MapData {
     pub walls: Vec<(u32, u32)>,
     #[serde(default)]
     pub select_object_boxes: Vec<SelectObjectBox>,
-    #[serde(default)] // Use default if kind is not specified in JSON
+    #[serde(default)]
     pub kind: MapKind,
-    
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Event {
     TeleportPlayer {
-        x: u32,
-        y: u32,
         map_row: i32,
         map_col: i32,
     },
-    // Add more event types as needed
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,13 +63,18 @@ pub struct SelectObjectBox {
     pub width: u32,
     pub height: u32,
     pub messages: Vec<String>,
-    #[serde(default)] // Use default if events are not specified
-    pub events: Vec<Event>, // Added
+    #[serde(default)]
+    pub events: Vec<Event>,
 }
 
 impl SelectObjectBox {
     pub fn to_rect(&self) -> ratatui::layout::Rect {
-        ratatui::layout::Rect::new(self.x as u16, self.y as u16, self.width as u16, self.height as u16)
+        ratatui::layout::Rect::new(
+            self.x as u16,
+            self.y as u16,
+            self.width as u16,
+            self.height as u16,
+        )
     }
 }
 
@@ -87,9 +86,8 @@ pub struct Map {
     pub ansi_sprite: String,
     pub walls: Vec<(u32, u32)>,
     pub player_spawn: (u32, u32),
-    pub select_object_boxes: Vec<SelectObjectBox>, // Added
-    pub kind: MapKind,                             // Added
-    
+    pub select_object_boxes: Vec<SelectObjectBox>,
+    pub kind: MapKind,
     pub width: u16,
     pub height: u16,
 }
@@ -98,16 +96,16 @@ impl Map {
     pub fn load(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(map_name);
 
-        // Load map data
+        // load data
         let data_path = base_path.join("data.json");
         let data_content = fs::read_to_string(&data_path)?;
         let map_data: MapData = serde_json::from_str(&data_content)?;
 
-        // Load ANSI sprite
+        // lood sprite
         let sprite_path = base_path.join("sprite.ans");
         let ansi_sprite = fs::read_to_string(&sprite_path)?;
 
-        // Calculate map dimensions
+        // map dimension
         let map_text_for_dimensions = ansi_sprite.as_bytes().into_text().unwrap();
 
         let height = {
@@ -135,7 +133,7 @@ impl Map {
             player_spawn: map_data.player_spawn,
             select_object_boxes: map_data.select_object_boxes,
             kind: map_data.kind, // Add this line
-            
+
             width,
             height,
         })
@@ -160,7 +158,6 @@ impl Map {
             walls: self.walls.clone(),
             select_object_boxes: self.select_object_boxes.clone(),
             kind: self.kind.clone(),
-            
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -172,19 +169,16 @@ impl Map {
         self.select_object_boxes.push(select_object_box);
     }
 
-    
-
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(map_name);
+        let base_path = Path::new("assets/map").join(map_name);
         fs::create_dir_all(&base_path)?;
 
         let data_path = base_path.join("data.json");
         let sprite_path = base_path.join("sprite.ans");
 
-        // Create a default map data
         let map_data = MapData {
             map_name: map_name.to_string(),
-            player_spawn: (10, 10), // Default spawn point
+            player_spawn: (10, 10),
             walls: vec![],
             select_object_boxes: vec![],
             kind: MapKind::Empty,
@@ -193,7 +187,6 @@ impl Map {
         let serialized = serde_json::to_string_pretty(&map_data)?;
         fs::write(&data_path, serialized)?;
 
-        // Create an empty sprite file
         fs::write(&sprite_path, "")?;
 
         Ok(Map {

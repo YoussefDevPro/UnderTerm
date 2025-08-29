@@ -9,33 +9,28 @@ use ratatui::{
     Frame,
 };
 
-// Constants for player interaction box (selection box)
 const PLAYER_INTERACTION_BOX_WIDTH: u16 = 30;
 const PLAYER_INTERACTION_BOX_HEIGHT: u16 = 20;
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
-    frame.render_widget(Block::default().bg(Color::Black), size); // Draw a solid black background block
+    frame.render_widget(Block::default().bg(Color::Black), size);
 
     let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
     let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
-
-    // Get the combined map text from GameState
     let combined_map_text = game_state.get_combined_map_text(size);
 
     let map_paragraph = Paragraph::new(combined_map_text)
-        .scroll((game_state.camera_y, game_state.camera_x)) // Use camera_y and camera_x
-        .style(Style::default().bg(Color::Black)); // Ensure map background is black
+        .scroll((game_state.camera_y, game_state.camera_x))
+        .style(Style::default().bg(Color::Black));
 
-    // Create a block to ensure the entire area is covered by the map background
     let map_block = Block::default().style(Style::default().bg(Color::Black));
-    frame.render_widget(map_block, size); // Draw the background block first
-    frame.render_widget(map_paragraph, size); // Then draw the map content on top
+    frame.render_widget(map_block, size);
+    frame.render_widget(map_paragraph, size);
 
     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         if let crate::game::map::MapKind::Objects = current_map.kind {
-            // Render SelectObjectBoxes only
             let (_player_sprite_content, player_sprite_width, player_sprite_height) =
                 game_state.player.get_sprite_content();
 
@@ -99,16 +94,15 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                 );
                 frame.render_widget(select_box_paragraph, clamped_rect);
             }
-
-            
         }
     }
 
-    let (player_sprite_content, player_sprite_width, player_sprite_height) = if game_state.debug_mode {
-        ("P".to_string().as_bytes().into_text().unwrap(), 1, 1)
-    } else {
-        game_state.player.get_sprite_content()
-    };
+    let (player_sprite_content, player_sprite_width, player_sprite_height) =
+        if game_state.debug_mode {
+            ("P".to_string().as_bytes().into_text().unwrap(), 1, 1)
+        } else {
+            game_state.player.get_sprite_content()
+        };
     let player_paragraph = Paragraph::new(player_sprite_content);
 
     let player_draw_rect = ratatui::layout::Rect::new(
@@ -159,16 +153,13 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                 let draw_y = (y as u16).saturating_sub(game_state.camera_y);
 
                 if draw_x < size.width && draw_y < size.height {
-                    let wall_paragraph = Paragraph::new("W")
-                        .style(Style::default().fg(Color::Red));
+                    let wall_paragraph = Paragraph::new("W").style(Style::default().fg(Color::Red));
                     let wall_rect = ratatui::layout::Rect::new(draw_x, draw_y, 1, 1);
                     frame.render_widget(wall_paragraph, wall_rect);
                 }
             }
         }
     }
-
-    
 
     if game_state.show_message {
         let message_block = Block::default()
@@ -214,7 +205,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             "Enter New Map Name"
         } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
             "Enter Target Map Name"
-        } else if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates {
+        } else if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates
+        {
             "Select Target Coordinates"
         } else {
             "Enter Message"
