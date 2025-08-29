@@ -222,126 +222,6 @@ pub fn process_events(
                 continue;
             }
 
-            
-            if game_state.show_message {
-                if key.code == KeyCode::Enter || key.code == KeyCode::Char('o') {
-                    if game_state.message_animation_finished {
-                        if game_state.is_confirming_select_box {
-                            game_state.is_confirming_select_box = false;
-                            game_state.is_text_input_active = true;
-                            game_state.text_input_buffer.clear();
-                            game_state.message = "Enter messages for the new object. Press Enter to add a message, Esc to finish.".to_string();
-                            game_state.show_message = true;
-                            game_state.message_animation_start_time = Instant::now();
-                            game_state.animated_message_content.clear();
-                            game_state.dismiss_message(); // Dismiss the "Select box confirmed" message
-                            game_state.block_player_movement_on_message = true; // Block movement again
-                        } else if game_state.teleport_creation_state
-                            == TeleportCreationState::EnteringMapName
-                        {
-                            // Do nothing, let the text input handler process the Enter key
-                        } else if game_state.teleport_creation_state
-                            == TeleportCreationState::SelectingCoordinates
-                        {
-                            if let Some(mut pending_box) = game_state.pending_select_box.take() {
-                                let target_map_name = game_state.teleport_destination_map_name_buffer.clone();
-                                let map_parts: Vec<&str> = target_map_name.split('_').collect();
-                                let target_map_row: i32 = map_parts[1].parse().unwrap_or(0);
-                                let target_map_col: i32 = map_parts[2].parse().unwrap_or(0);
-
-                                let teleport_event = crate::game::map::Event::TeleportPlayer {
-                                    x: game_state.player.x as u32,
-                                    y: game_state.player.y as u32,
-                                    map_row: target_map_row,
-                                    map_col: target_map_col,
-                                };
-                                pending_box.events.push(teleport_event);
-
-                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
-                                    // Find the box we just created and update its events
-                                    if let Some(index) = map_to_modify.select_object_boxes.iter().position(|b| b.id == pending_box.id) {
-                                        map_to_modify.select_object_boxes[index] = pending_box;
-                                        if let Err(e) = map_to_modify.save_data() {
-                                            game_state.message = format!("Failed to save map data: {}", e);
-                                        } else {
-                                            game_state.message = "Teleport event added and map saved.".to_string();
-                                        }
-                                    } else {
-                                        game_state.message = "Error: Could not find the pending teleport box to update.".to_string();
-                                    }
-                                } else {
-                                    game_state.message = "Error: Current map not found.".to_string();
-                                }
-                                game_state.show_message = true;
-                                game_state.message_animation_start_time = Instant::now();
-                                game_state.animated_message_content.clear();
-                                game_state.teleport_creation_state = TeleportCreationState::None; // Reset state
-                                game_state.block_player_movement_on_message = true; // Reset movement blocking
-                            } else {
-                                game_state.message = "Error: No pending teleport box found.".to_string();
-                                game_state.show_message = true;
-                                game_state.message_animation_start_time = Instant::now();
-                                game_state.animated_message_content.clear();
-                            }
-                        } else if game_state.is_text_input_active { // If text input is active, don't dismiss message yet
-                             // Do nothing, let the text input handler process the Enter key
-                        } else {
-                            if let Some(box_id) = game_state.current_interaction_box_id {
-                                let current_map_key =
-                                    (game_state.current_map_row, game_state.current_map_col);
-                                if let Some(current_map) = 
-                                    game_state.loaded_maps.get(&current_map_key)
-                                {
-                                    if let Some(interacting_box) = current_map
-                                        .select_object_boxes
-                                        .iter()
-                                        .find(|b| b.id == box_id)
-                                    {
-                                        // If this is a new interaction, or we've cycled through all messages, reset index
-                                        if game_state.current_interaction_box_id
-                                            != Some(interacting_box.id)
-                                        {
-                                            game_state.current_message_index = 0;
-                                        }
-
-                                        if game_state.current_message_index
-                                            < interacting_box.messages.len()
-                                        {
-                                            game_state.message = interacting_box.messages
-                                                [game_state.current_message_index]
-                                                .clone();
-                                            game_state.show_message = true;
-                                            game_state.message_animation_start_time =
-                                                Instant::now();
-                                            game_state.animated_message_content.clear();
-                                            game_state.message_animation_finished = false;
-                                            game_state.current_message_index += 1;
-                                        // Increment for next time
-                                        } else {
-                                            let _events_to_process: Vec<crate::game::map::Event> =
-                                                interacting_box.events.clone();
-
-                                            // All messages displayed, dismiss and trigger events
-                                            game_state.dismiss_message();
-                                            game_state.current_interaction_box_id = None; // Clear interaction
-                                            game_state.current_message_index = 0; // Reset for future interactions
-
-                                            
-                                        }
-                                    }
-                                }
-                            }
-                            
-                        }
-                    } else {
-                        game_state.skip_message_animation();
-                    }
-                } else if key.code == KeyCode::Char(' ') {
-                    game_state.skip_message_animation();
-                }
-            }
-
             match key.kind {
                 event::KeyEventKind::Press => {
                     key_states.insert(key.code, true);
@@ -376,94 +256,65 @@ pub fn process_events(
                     } else if debug::input::handle_debug_input(key, game_state) {
                         // Handled by debug module
                     } else if key.code == KeyCode::Enter {
-                        let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
-                        let collision_box_x = game_state.player.x;
-                        let collision_box_y = game_state
-                            .player
-                            .y
-                            .saturating_add(player_sprite_height)
-                            .saturating_sub(4);
-                        let collision_box =
-                            ratatui::layout::Rect::new(collision_box_x, collision_box_y, 21, 4);
-                        let interaction_boxes = [
-                            ratatui::layout::Rect::new(
-                                collision_box.x,
-                                collision_box.y.saturating_sub(10),
-                                collision_box.width,
-                                10,
-                            ),
-                            ratatui::layout::Rect::new(
-                                collision_box.x,
-                                collision_box.y + collision_box.height,
-                                collision_box.width,
-                                3,
-                            ),
-                            ratatui::layout::Rect::new(
-                                collision_box.x.saturating_sub(5),
-                                collision_box.y,
-                                5,
-                                collision_box.height,
-                            ),
-                            ratatui::layout::Rect::new(
-                                collision_box.x + collision_box.width,
-                                collision_box.y,
-                                5,
-                                collision_box.height,
-                            ),
-                        ];
-                        let current_map_key =
-                            (game_state.current_map_row, game_state.current_map_col);
-                        if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                            if let Some(found_box) =
-                                current_map.select_object_boxes.iter().find(|b| {
-                                    let select_box_rect = b.to_rect();
-                                    interaction_boxes.iter().any(|interaction_box| {
-                                        interaction_box.intersects(select_box_rect)
-                                    })
-                                })
-                            {
-                                // Anti-looping: If recently teleported from this box, ignore interaction
-                                if let Some(teleported_from_id) =
-                                    game_state.recently_teleported_from_box_id
-                                {
-                                    if teleported_from_id == found_box.id {
-                                        // Check if player is still inside the box
-                                        let player_rect = ratatui::layout::Rect::new(
-                                            game_state.player.x,
-                                            game_state.player.y,
-                                            1,
-                                            1,
-                                        ); // Assuming player is 1x1 for simplicity
-                                        if found_box.to_rect().intersects(player_rect) {
-                                            // Player is still inside the box, ignore interaction
-                                            return Ok(false);
-                                        } else {
-                                            // Player has moved out, clear the flag
-                                            game_state.recently_teleported_from_box_id = None;
+                        if game_state.show_message {
+                            if game_state.message_animation_finished {
+                                if let Some(box_id) = game_state.current_interaction_box_id {
+                                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                        if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                            if game_state.current_message_index < interacting_box.messages.len() {
+                                                game_state.message = interacting_box.messages[game_state.current_message_index].clone();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time = Instant::now();
+                                                game_state.animated_message_content.clear();
+                                                game_state.message_animation_finished = false;
+                                                game_state.current_message_index += 1;
+                                            } else {
+                                                let events = interacting_box.events.clone();
+                                                let box_id = interacting_box.id;
+                                                game_state.dismiss_message();
+                                                game_state.current_interaction_box_id = None;
+                                                game_state.current_message_index = 0;
+                                                let _events_to_process: Vec<crate::game::map::Event> = events;
+                                                game_state.recently_teleported_from_box_id = Some(box_id);
+                                            }
                                         }
                                     }
+                                } else {
+                                    game_state.dismiss_message();
                                 }
-                                if !found_box.messages.is_empty() {
-                                    // If this is a new interaction, or we've cycled through all messages, reset index
-                                    if game_state.current_interaction_box_id != Some(found_box.id) {
-                                        game_state.current_message_index = 0;
-                                    }
-
-                                    if game_state.current_message_index < found_box.messages.len() {
-                                        game_state.message = found_box.messages
-                                            [game_state.current_message_index]
-                                            .clone();
-                                        game_state.show_message = true;
-                                        game_state.message_animation_start_time = Instant::now();
-                                        game_state.animated_message_content.clear();
-                                        game_state.message_animation_finished = false;
-                                        game_state.current_message_index += 1; // Increment for next time
-                                    } else {
-                                        let _events_to_process: Vec<crate::game::map::Event> =
-                                            found_box.events.clone(); // Move this line here
-                                        game_state.recently_teleported_from_box_id =
-                                            Some(found_box.id); // Set the ID of the box that triggered teleport
-                                        
+                            } else {
+                                game_state.skip_message_animation();
+                            }
+                        } else {
+                            // No message is shown, check for new interaction
+                            let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
+                            let collision_box_x = game_state.player.x;
+                            let collision_box_y = game_state.player.y.saturating_add(player_sprite_height).saturating_sub(4);
+                            let collision_box = ratatui::layout::Rect::new(collision_box_x, collision_box_y, 21, 4);
+                            let interaction_boxes = [
+                                ratatui::layout::Rect::new(collision_box.x, collision_box.y.saturating_sub(10), collision_box.width, 10),
+                                ratatui::layout::Rect::new(collision_box.x, collision_box.y + collision_box.height, collision_box.width, 3),
+                                ratatui::layout::Rect::new(collision_box.x.saturating_sub(5), collision_box.y, 5, collision_box.height),
+                                ratatui::layout::Rect::new(collision_box.x + collision_box.width, collision_box.y, 5, collision_box.height),
+                            ];
+                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                            if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                if let Some(found_box) = current_map.select_object_boxes.iter().find(|b| {
+                                    let select_box_rect = b.to_rect();
+                                    interaction_boxes.iter().any(|interaction_box| interaction_box.intersects(select_box_rect))
+                                }) {
+                                    if !found_box.messages.is_empty() {
+                                        if game_state.recently_teleported_from_box_id != Some(found_box.id) {
+                                            game_state.current_interaction_box_id = Some(found_box.id);
+                                            game_state.current_message_index = 0;
+                                            game_state.message = found_box.messages[game_state.current_message_index].clone();
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.animated_message_content.clear();
+                                            game_state.message_animation_finished = false;
+                                            game_state.current_message_index += 1;
+                                        }
                                     }
                                 }
                             }

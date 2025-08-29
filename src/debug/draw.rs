@@ -57,8 +57,8 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
     }
 
     // Draw player collision box
-    let (_, _, player_sprite_height) = game_state.player.get_sprite_content();
-    let collision_box_start_x = game_state.player.x;
+    let (_, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
+    let collision_box_start_x = game_state.player.x.saturating_add(player_sprite_width / 2).saturating_sub(COLLISION_BOX_WIDTH / 2);
     let collision_box_start_y = game_state
         .player
         .y
@@ -233,10 +233,10 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     let (map_width, map_height, map_kind) = game_state
         .loaded_maps
         .get(&current_map_key)
-        .map(|m| (m.width, m.height, format!("{:?}", m.kind)))
+        .map(|m| (m.width, m.height, format!( "{:?}", m.kind)))
         .unwrap_or((0, 0, "N/A".to_string()));
 
-    let debug_text = vec![
+    let mut debug_text = vec![
         format!("Player: ({}, {})", game_state.player.x, game_state.player.y),
         format!("Direction: {:?}", game_state.player.direction),
         format!("Animation Frame: {}", game_state.player.animation_frame),
@@ -245,7 +245,8 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         format!("Map: ({}, {})", map_width, map_height),
         format!(
             "Screen Player Pos: ({}, {})",
-            player_x_on_screen, player_y_on_screen
+            player_x_on_screen,
+            player_y_on_screen
         ),
         format!("Debug Mode: {}", game_state.debug_mode),
         format!(
@@ -255,6 +256,12 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         format!("Anim Frame Duration: {:?}", ANIMATION_FRAME_DURATION),
         format!("Map Kind: {}", map_kind),
     ];
+
+    debug_text.push("".to_string());
+    debug_text.push("Interaction Zones:".to_string());
+    for info in &game_state.debug_info {
+        debug_text.push(info.clone());
+    }
 
     let debug_block = Block::default()
         .borders(Borders::ALL)
