@@ -43,10 +43,18 @@ pub fn process_events(
             if game_state.is_text_input_active {
                 match key.code {
                     KeyCode::Char(c) => {
-                        game_state.text_input_buffer.push(c);
+                        if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+                            game_state.teleport_destination_map_name_buffer.push(c);
+                        } else {
+                            game_state.text_input_buffer.push(c);
+                        }
                     }
                     KeyCode::Backspace => {
-                        game_state.text_input_buffer.pop();
+                        if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+                            game_state.teleport_destination_map_name_buffer.pop();
+                        } else {
+                            game_state.text_input_buffer.pop();
+                        }
                     }
                     KeyCode::Enter => {
                         if game_state.is_creating_map {
@@ -71,6 +79,55 @@ pub fn process_events(
                             game_state.show_message = true;
                             game_state.message_animation_start_time = Instant::now();
                             game_state.animated_message_content.clear();
+                        } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+                            let target_map_name = game_state.teleport_destination_map_name_buffer.trim().to_string();
+                            if target_map_name.is_empty() {
+                                game_state.message = "Target map name cannot be empty.".to_string();
+                                game_state.show_message = true;
+                                game_state.message_animation_start_time = Instant::now();
+                                game_state.animated_message_content.clear();
+                            } else {
+                                let parts: Vec<&str> = target_map_name.split('_').collect();
+                                if parts.len() == 3 && parts[0] == "map" {
+                                    if let (Ok(map_row), Ok(map_col)) = (parts[1].parse::<i32>(), parts[2].parse::<i32>()) {
+                                        if let Some(ref mut pending_box) = game_state.pending_select_box {
+                                            pending_box.events.push(
+                                                crate::game::map::Event::TeleportPlayer {
+                                                    map_row,
+                                                    map_col,
+                                                },
+                                            );
+
+                                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                            if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                                                if let Err(e) = map_to_modify.save_data() {
+                                                    game_state.message = format!("Failed to save map data: {}", e);
+                                                } else {
+                                                    game_state.message = format!("Teleport event to {} added and saved.", target_map_name);
+                                                }
+                                            } else {
+                                                game_state.message = "Error: Current map not found for saving.".to_string();
+                                            }
+
+                                            game_state.teleport_creation_state = TeleportCreationState::None;
+                                            game_state.is_text_input_active = false;
+                                            game_state.teleport_destination_map_name_buffer.clear();
+                                            game_state.pending_select_box = None;
+                                            game_state.is_drawing_select_box = false;
+                                            game_state.block_player_movement_on_message = true;
+                                        } else {
+                                            game_state.message = "Error: No pending select box to add event to.".to_string();
+                                        }
+                                    } else {
+                                        game_state.message = "Invalid map coordinates in name. Format: map_row_col".to_string();
+                                    }
+                                } else {
+                                    game_state.message = "Invalid map name format. Expected: map_row_col".to_string();
+                                }
+                                game_state.show_message = true;
+                                game_state.message_animation_start_time = Instant::now();
+                                game_state.animated_message_content.clear();
+                            }
                         } else if let Some(ref mut pending_box) = game_state.pending_select_box {
                             pending_box
                                 .messages
@@ -255,75 +312,6 @@ pub fn process_events(
                                 }
                             } else {
                                 game_state.skip_message_animation();
-                            }
-                        } else {
-                            let (_, _, player_sprite_height) =
-                                game_state.player.get_sprite_content();
-                            let collision_box_x = game_state.player.x;
-                            let collision_box_y = game_state
-                                .player
-                                .y
-                                .saturating_add(player_sprite_height)
-                                .saturating_sub(4);
-                            let collision_box =
-                                ratatui::layout::Rect::new(collision_box_x, collision_box_y, 21, 4);
-                            let interaction_boxes = [
-                                ratatui::layout::Rect::new(
-                                    collision_box.x,
-                                    collision_box.y.saturating_sub(10),
-                                    collision_box.width,
-                                    10,
-                                ),
-                                ratatui::layout::Rect::new(
-                                    collision_box.x,
-                                    collision_box.y + collision_box.height,
-                                    collision_box.width,
-                                    3,
-                                ),
-                                ratatui::layout::Rect::new(
-                                    collision_box.x.saturating_sub(5),
-                                    collision_box.y,
-                                    5,
-                                    collision_box.height,
-                                ),
-                                ratatui::layout::Rect::new(
-                                    collision_box.x + collision_box.width,
-                                    collision_box.y,
-                                    5,
-                                    collision_box.height,
-                                ),
-                            ];
-                            let current_map_key =
-                                (game_state.current_map_row, game_state.current_map_col);
-                            if let Some(current_map) = game_state.loaded_maps.get(&current_map_key)
-                            {
-                                if let Some(found_box) =
-                                    current_map.select_object_boxes.iter().find(|b| {
-                                        let select_box_rect = b.to_rect();
-                                        interaction_boxes.iter().any(|interaction_box| {
-                                            interaction_box.intersects(select_box_rect)
-                                        })
-                                    })
-                                {
-                                    if !found_box.messages.is_empty() {
-                                        if game_state.recently_teleported_from_box_id
-                                            != Some(found_box.id)
-                                        {
-                                            game_state.current_interaction_box_id =
-                                                Some(found_box.id);
-                                            game_state.current_message_index = 0;
-                                            game_state.message = found_box.messages
-                                                [game_state.current_message_index]
-                                                .clone();
-                                            game_state.show_message = true;
-                                            game_state.message_animation_start_time =
-                                                Instant::now();
-                                            game_state.animated_message_content.clear();
-                                            game_state.message_animation_finished = false;
-                                            game_state.current_message_index += 1;
-                                        }
-                                    }
-                                }
                             }
                         }
                     } else if key.code == KeyCode::Char('q') {

@@ -3927,25 +3927,8 @@
       "height": 4,
       "messages": [],
       "events": []
-    },
-    {
-      "id": 2,
-      "x": 395,
-      "y": 49,
-      "width": 27,
-      "height": 4,
-      "messages": [],
-      "events": [
-        {
-          "TeleportPlayer": {
-            "x": 421,
-            "y": 52,
-            "map_row": 1,
-            "map_col": 2
-          }
-        }
-      ]
     }
+    
   ],
   "kind": "empty"
 }

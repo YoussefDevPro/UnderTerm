@@ -205,10 +205,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             "Enter New Map Name"
         } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
             "Enter Target Map Name"
-        } else if game_state.teleport_creation_state == TeleportCreationState::SelectingCoordinates
-        {
-            "Select Target Coordinates"
-        } else {
+         } else {
             "Enter Message"
         };
         let input_block = Block::default()

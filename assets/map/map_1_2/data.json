@@ -25,25 +25,7 @@
           }
         }
       ]
-    },
-    {
-      "id": 2,
-      "x": 105,
-      "y": 89,
-      "width": 30,
-      "height": 1,
-      "messages": [],
-      "events": [
-        {
-          "TeleportPlayer": {
-            "x": 134,
-            "y": 89,
-            "map_row": 0,
-            "map_col": 0
-          }
-        }
-      ]
     }
-  ],
+      ],
   "kind": "empty"
 }

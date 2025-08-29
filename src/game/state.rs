@@ -267,6 +267,8 @@ impl GameState {
         self.camera_x = new_camera_x;
         self.camera_y = new_camera_y;
 
+        let mut map_to_insert_after_loop: Option<((i32, i32), Map)> = None;
+
         if !self.debug_mode {
             let player_collision_rect = self.player.get_collision_rect();
             let mut teleport_destination: Option<(u16, u16, i32, i32, String)> = None;
@@ -288,9 +290,10 @@ impl GameState {
                                 } => {
                                     let new_map_name = format!("map_{}_{}", map_row, map_col);
                                     let new_map_key = (*map_row, *map_col);
+                                    let mut loaded_map: Option<Map> = None;
                                     if !self.loaded_maps.contains_key(&new_map_key) {
-                                        if let Ok(new_map) = crate::game::map::Map::load(&new_map_name) {
-                                            self.loaded_maps.insert(new_map_key, new_map);
+                                        if let Ok(map) = crate::game::map::Map::load(&new_map_name) {
+                                            loaded_map = Some(map);
                                         } else {
                                             self.message = format!("Failed to load map: {}", new_map_name);
                                             self.show_message = true;
@@ -298,6 +301,9 @@ impl GameState {
                                             self.animated_message_content.clear();
                                             break;
                                         }
+                                    }
+                                    if let Some(map) = loaded_map {
+                                        map_to_insert_after_loop = Some((new_map_key, map));
                                     }
                                     if let Some(new_map) = self.loaded_maps.get(&new_map_key) {
                                         teleport_destination = Some((
@@ -334,6 +340,10 @@ impl GameState {
                 self.current_map_col = map_col;
                 self.current_map_name = new_map_name;
             }
+        }
+
+        if let Some((key, map)) = map_to_insert_after_loop {
+            self.loaded_maps.insert(key, map);
         }
 
         self.debug_info.clear();
