@@ -88,25 +88,33 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             } else if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
                 if let Some((start_x, start_y)) = game_state.select_box_start_coords {
                     let (end_x, end_y) = (game_state.player.x, game_state.player.y);
-                    let new_id = game_state.loaded_maps.get(&(game_state.current_map_row, game_state.current_map_col))
-                        .map_or(0, |m| m.select_object_boxes.iter().map(|b| b.id).max().unwrap_or(0) + 1);
-                    let new_teleport_box = crate::game::map::SelectObjectBox {
-                        id: new_id,
-                        x: start_x.min(end_x) as u32,
-                        y: start_y.min(end_y) as u32,
-                        width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
-                        height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
-                        messages: Vec::new(),
-                        events: Vec::new(), // Events will be added in the next step
-                    };
-                    game_state.pending_select_box = Some(new_teleport_box);
-                    game_state.teleport_creation_state = TeleportCreationState::EnteringMapName;
-                    game_state.is_text_input_active = true;
-                    game_state.teleport_destination_map_name_buffer.clear();
-                    game_state.message = "Enter target map name (e.g., map_0_0):".to_string();
-                    game_state.show_message = true;
-                    game_state.message_animation_start_time = Instant::now();
-                    game_state.animated_message_content.clear();
+                    
+                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                    if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                        let new_id = map_to_modify.select_object_boxes.iter().map(|b| b.id).max().unwrap_or(0) + 1;
+                        let new_teleport_box = crate::game::map::SelectObjectBox {
+                            id: new_id,
+                            x: start_x.min(end_x) as u32,
+                            y: start_y.min(end_y) as u32,
+                            width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
+                            height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
+                            messages: Vec::new(),
+                            events: Vec::new(), // Events will be added in the next step
+                        };
+                        map_to_modify.add_select_object_box(new_teleport_box.clone()); // Add the box to the map
+                        if let Err(e) = map_to_modify.save_data() {
+                            game_state.message = format!("Failed to save map data: {}", e);
+                        } else {
+                            game_state.message = "Teleport box created and saved. Enter target map name (e.g., map_0_0):".to_string();
+                        }
+                        game_state.pending_select_box = Some(new_teleport_box); // Keep it pending for event addition
+                        game_state.teleport_creation_state = TeleportCreationState::EnteringMapName;
+                        game_state.is_text_input_active = true;
+                        game_state.teleport_destination_map_name_buffer.clear();
+                        game_state.show_message = true;
+                        game_state.message_animation_start_time = Instant::now();
+                        game_state.animated_message_content.clear();
+                    }
                 }
             }
             

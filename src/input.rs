@@ -79,12 +79,11 @@ pub fn process_events(
                                 // Try to load the map to validate the name
                                 if let Ok(loaded_map) = crate::game::map::Map::load(&map_name) {
                                     let map_parts: Vec<&str> = loaded_map.name.split('_').collect();
-                                    let map_row: i32 = map_parts[1].parse().unwrap_or(0);
-                                    let map_col: i32 = map_parts[2].parse().unwrap_or(0);
+                                    let _map_row: i32 = map_parts[1].parse().unwrap_or(0);
+                                    let _map_col: i32 = map_parts[2].parse().unwrap_or(0);
 
                                     game_state.teleport_destination_map_name_buffer = map_name;
-                                    game_state.teleport_destination_x = game_state.player.x; // Start at player's current X
-                                    game_state.teleport_destination_y = game_state.player.y; // Start at player's current Y
+                                    
 
                                     game_state.is_text_input_active = false; // Text input finished for map name
                                     game_state.teleport_creation_state =
@@ -223,7 +222,7 @@ pub fn process_events(
                 continue;
             }
 
-            let mut teleport_target = None;
+            
             if game_state.show_message {
                 if key.code == KeyCode::Enter || key.code == KeyCode::Char('o') {
                     if game_state.message_animation_finished {
@@ -244,14 +243,54 @@ pub fn process_events(
                         } else if game_state.teleport_creation_state
                             == TeleportCreationState::SelectingCoordinates
                         {
-                            // Do nothing, let the main Enter handler process the Enter key
+                            if let Some(mut pending_box) = game_state.pending_select_box.take() {
+                                let target_map_name = game_state.teleport_destination_map_name_buffer.clone();
+                                let map_parts: Vec<&str> = target_map_name.split('_').collect();
+                                let target_map_row: i32 = map_parts[1].parse().unwrap_or(0);
+                                let target_map_col: i32 = map_parts[2].parse().unwrap_or(0);
+
+                                let teleport_event = crate::game::map::Event::TeleportPlayer {
+                                    x: game_state.player.x as u32,
+                                    y: game_state.player.y as u32,
+                                    map_row: target_map_row,
+                                    map_col: target_map_col,
+                                };
+                                pending_box.events.push(teleport_event);
+
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                                    // Find the box we just created and update its events
+                                    if let Some(index) = map_to_modify.select_object_boxes.iter().position(|b| b.id == pending_box.id) {
+                                        map_to_modify.select_object_boxes[index] = pending_box;
+                                        if let Err(e) = map_to_modify.save_data() {
+                                            game_state.message = format!("Failed to save map data: {}", e);
+                                        } else {
+                                            game_state.message = "Teleport event added and map saved.".to_string();
+                                        }
+                                    } else {
+                                        game_state.message = "Error: Could not find the pending teleport box to update.".to_string();
+                                    }
+                                } else {
+                                    game_state.message = "Error: Current map not found.".to_string();
+                                }
+                                game_state.show_message = true;
+                                game_state.message_animation_start_time = Instant::now();
+                                game_state.animated_message_content.clear();
+                                game_state.teleport_creation_state = TeleportCreationState::None; // Reset state
+                                game_state.block_player_movement_on_message = true; // Reset movement blocking
+                            } else {
+                                game_state.message = "Error: No pending teleport box found.".to_string();
+                                game_state.show_message = true;
+                                game_state.message_animation_start_time = Instant::now();
+                                game_state.animated_message_content.clear();
+                            }
                         } else if game_state.is_text_input_active { // If text input is active, don't dismiss message yet
                              // Do nothing, let the text input handler process the Enter key
                         } else {
                             if let Some(box_id) = game_state.current_interaction_box_id {
                                 let current_map_key =
                                     (game_state.current_map_row, game_state.current_map_col);
-                                if let Some(current_map) =
+                                if let Some(current_map) = 
                                     game_state.loaded_maps.get(&current_map_key)
                                 {
                                     if let Some(interacting_box) = current_map
@@ -280,7 +319,7 @@ pub fn process_events(
                                             game_state.current_message_index += 1;
                                         // Increment for next time
                                         } else {
-                                            let events_to_process: Vec<crate::game::map::Event> =
+                                            let _events_to_process: Vec<crate::game::map::Event> =
                                                 interacting_box.events.clone();
 
                                             // All messages displayed, dismiss and trigger events
@@ -288,59 +327,12 @@ pub fn process_events(
                                             game_state.current_interaction_box_id = None; // Clear interaction
                                             game_state.current_message_index = 0; // Reset for future interactions
 
-                                            teleport_target = events_to_process.iter().find_map(|event| {
-                                                if let crate::game::map::Event::TeleportPlayer { x, y, map_row, map_col } = event {
-                                                    Some((*x as u16, *y as u16, *map_row, *map_col))
-                                                } else {
-                                                    None
-                                                }
-                                            });
+                                            
                                         }
                                     }
                                 }
                             }
-                            if let Some((x, y, map_row, map_col)) = teleport_target {
-                                // Store current position as origin before teleporting
-                                let old_map_row = game_state.current_map_row;
-                                let old_map_col = game_state.current_map_col;
-                                let old_player_x = game_state.player.x;
-                                let old_player_y = game_state.player.y;
-
-                                game_state.player.x = x;
-                                game_state.player.y = y;
-                                game_state.current_map_row = map_row;
-                                game_state.current_map_col = map_col;
-                                let new_map_key = (map_row, map_col);
-                                if !game_state.loaded_maps.contains_key(&new_map_key) {
-                                    let new_map_name = format!("map_{}_{}", map_row, map_col);
-                                    if let Ok(new_map) = crate::game::map::Map::load(&new_map_name)
-                                    {
-                                        game_state.loaded_maps.insert(new_map_key, new_map);
-                                    } else {
-                                        game_state.message =
-                                            format!("Failed to load map: {}", new_map_name);
-                                        game_state.show_message = true;
-                                        game_state.message_animation_start_time = Instant::now();
-                                        game_state.animated_message_content.clear();
-                                    }
-                                }
-                                game_state.current_map_name =
-                                    format!("map_{}_{}", map_row, map_col);
-
-                                // If returning to the origin map, place player at origin coordinates
-                                if let Some((origin_x, origin_y, origin_map_row, origin_map_col)) =
-                                    game_state.last_teleport_origin
-                                {
-                                    if origin_map_row == game_state.current_map_row
-                                        && origin_map_col == game_state.current_map_col
-                                    {
-                                        game_state.player.x = origin_x as u16;
-                                        game_state.player.y = origin_y as u16;
-                                        game_state.last_teleport_origin = None; // Clear origin after returning
-                                    }
-                                }
-                            }
-                            game_state.dismiss_message();
+                            
                         }
                     } else {
                         game_state.skip_message_animation();
@@ -467,25 +459,11 @@ pub fn process_events(
                                         game_state.message_animation_finished = false;
                                         game_state.current_message_index += 1; // Increment for next time
                                     } else {
-                                        let events_to_process: Vec<crate::game::map::Event> =
+                                        let _events_to_process: Vec<crate::game::map::Event> =
                                             found_box.events.clone(); // Move this line here
                                         game_state.recently_teleported_from_box_id =
                                             Some(found_box.id); // Set the ID of the box that triggered teleport
-                                        teleport_target =
-                                            events_to_process.iter().find_map(|event| {
-                                                if let crate::game::map::Event::TeleportPlayer {
-                                                    x,
-                                                    y,
-                                                    map_row,
-                                                    map_col,
-                                                } = event
-                                                {
-                                                    Some((*x as u16, *y as u16, *map_row, *map_col))
-                                                // Re-add dereferencing
-                                                } else {
-                                                    None
-                                                }
-                                            });
+                                        
                                     }
                                 }
                             }

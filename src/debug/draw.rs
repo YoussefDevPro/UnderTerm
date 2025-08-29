@@ -1,19 +1,17 @@
 use crate::game::config::ANIMATION_FRAME_DURATION;
 use crate::game::state::{GameState, TeleportCreationState};
 
-
 use ratatui::{
-    layout::{Rect},
+    Frame,
+    layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
 
 const TOP_INTERACTION_BOX_HEIGHT: u16 = 10;
 const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 3;
 const LEFT_INTERACTION_BOX_WIDTH: u16 = 5;
 const RIGHT_INTERACTION_BOX_WIDTH: u16 = 5;
-
 const COLLISION_BOX_WIDTH: u16 = 21;
 const COLLISION_BOX_HEIGHT: u16 = 4;
 
@@ -28,10 +26,12 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                 let wall_y_on_screen = wy.saturating_sub(game_state.camera_y as u32);
 
                 if wall_x_on_screen < size.width as u32 && wall_y_on_screen < size.height as u32 {
-                    let draw_rect = Rect::new(wall_x_on_screen as u16, wall_y_on_screen as u16, 1, 1);
+                    let draw_rect =
+                        Rect::new(wall_x_on_screen as u16, wall_y_on_screen as u16, 1, 1);
                     let clamped_rect = draw_rect.intersection(size);
                     if !clamped_rect.is_empty() {
-                        let wall_paragraph = Paragraph::new("W").style(Style::default().fg(Color::Red).bg(Color::Black));
+                        let wall_paragraph = Paragraph::new("W")
+                            .style(Style::default().fg(Color::Red).bg(Color::Black));
                         frame.render_widget(wall_paragraph, clamped_rect);
                     }
                 }
@@ -39,7 +39,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    // Draw spawn point 'S'
+    // spawn point
     let spawn_x = game_state.player.x;
     let spawn_y = game_state.player.y;
 
@@ -50,7 +50,8 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         let draw_rect = Rect::new(spawn_x_on_screen, spawn_y_on_screen, 1, 1);
         let clamped_rect = draw_rect.intersection(size);
         if !clamped_rect.is_empty() {
-            let spawn_paragraph = Paragraph::new("S").style(Style::default().fg(Color::Green).bg(Color::Black));
+            let spawn_paragraph =
+                Paragraph::new("S").style(Style::default().fg(Color::Green).bg(Color::Black));
             frame.render_widget(spawn_paragraph, clamped_rect);
         }
     }
@@ -121,7 +122,12 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         let box_on_screen_x = box_rect.x.saturating_sub(game_state.camera_x);
         let box_on_screen_y = box_rect.y.saturating_sub(game_state.camera_y);
 
-        let draw_rect = Rect::new(box_on_screen_x, box_on_screen_y, box_rect.width, box_rect.height);
+        let draw_rect = Rect::new(
+            box_on_screen_x,
+            box_on_screen_y,
+            box_rect.width,
+            box_rect.height,
+        );
 
         let clamped_rect = draw_rect.intersection(size);
         if !clamped_rect.is_empty() {
@@ -134,8 +140,6 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         }
     }
 
-    
-
     // Render SelectObjectBoxes
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         for select_box in &current_map.select_object_boxes {
@@ -144,7 +148,12 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
             let draw_x = select_box_rect.x.saturating_sub(game_state.camera_x);
             let draw_y = select_box_rect.y.saturating_sub(game_state.camera_y);
 
-            let draw_rect = Rect::new(draw_x, draw_y, select_box_rect.width, select_box_rect.height);
+            let draw_rect = Rect::new(
+                draw_x,
+                draw_y,
+                select_box_rect.width,
+                select_box_rect.height,
+            );
             let clamped_rect = draw_rect.intersection(size);
             if !clamped_rect.is_empty() {
                 let select_box_paragraph = Paragraph::new("I").block(
@@ -158,7 +167,10 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
     }
 
     // Draw pending select box or teleport line
-    if (game_state.is_drawing_select_box || game_state.teleport_creation_state == TeleportCreationState::DrawingBox) && game_state.select_box_start_coords.is_some() {
+    if (game_state.is_drawing_select_box
+        || game_state.teleport_creation_state == TeleportCreationState::DrawingBox)
+        && game_state.select_box_start_coords.is_some()
+    {
         if let Some((start_x, start_y)) = game_state.select_box_start_coords {
             let (end_x, end_y) = (game_state.player.x, game_state.player.y);
 
@@ -174,7 +186,12 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
             let clamped_rect = draw_rect.intersection(size);
 
             if !clamped_rect.is_empty() {
-                let color = if game_state.teleport_creation_state == TeleportCreationState::DrawingBox { Color::Magenta } else { Color::Green };
+                let color =
+                    if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
+                        Color::Magenta
+                    } else {
+                        Color::Green
+                    };
                 let pending_box_paragraph = Paragraph::new("").block(
                     Block::default()
                         .borders(Borders::ALL)
@@ -228,15 +245,12 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         format!("Map: ({}, {})", map_width, map_height),
         format!(
             "Screen Player Pos: ({}, {})",
-            player_x_on_screen,
-            player_y_on_screen
+            player_x_on_screen, player_y_on_screen
         ),
         format!("Debug Mode: {}", game_state.debug_mode),
         format!(
             "Current Map: {} ({}, {})",
-            game_state.current_map_name,
-            game_state.current_map_row,
-            game_state.current_map_col
+            game_state.current_map_name, game_state.current_map_row, game_state.current_map_col
         ),
         format!("Anim Frame Duration: {:?}", ANIMATION_FRAME_DURATION),
         format!("Map Kind: {}", map_kind),

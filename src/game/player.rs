@@ -168,6 +168,20 @@ impl Player {
         }
     }
 
+    pub fn get_collision_rect(&self) -> ratatui::layout::Rect {
+        let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
+
+        let collision_box_x = self.x.saturating_add(player_sprite_width / 2).saturating_sub(PLAYER_COLLISION_WIDTH / 2);
+        let collision_box_y = self.y.saturating_add(player_sprite_height).saturating_sub(PLAYER_COLLISION_HEIGHT);
+
+        ratatui::layout::Rect::new(
+            collision_box_x,
+            collision_box_y,
+            PLAYER_COLLISION_WIDTH,
+            PLAYER_COLLISION_HEIGHT,
+        )
+    }
+
     pub fn update(
         &mut self,
         context: &mut PlayerUpdateContext,
