@@ -205,7 +205,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             "Enter New Map Name"
         } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
             "Enter Target Map Name"
-         } else {
+        } else {
             "Enter Message"
         };
         let input_block = Block::default()
@@ -326,5 +326,40 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
         frame.render_widget(Clear, input_area);
         frame.render_widget(input_paragraph, input_area);
+    }
+
+    if game_state.esc_press_start_time.is_some() {
+        let exiting_text_lines = vec![
+            "╔═╗═╗ ╦╦╔╦╗╦╔╗╔╔═╗",
+            "║╣ ╔╩╦╝║ ║ ║║║║║ ╦",
+            "╚═╝╩ ╚═╩ ╩ ╩╝╚╝╚═╝",
+        ];
+
+        let num_dots = game_state.esc_hold_dots as usize;
+        let dot_width = 4;
+        let total_dots_width = num_dots * dot_width;
+
+        let dot_line_0 = " ".repeat(total_dots_width);
+        let dot_line_1 = "▄██▄ ".repeat(num_dots);
+        let dot_line_2 = "▀██▀ ".repeat(num_dots);
+
+        let combined_lines = vec![
+            format!("{} {}", exiting_text_lines[0], dot_line_0),
+            format!("{} {}", exiting_text_lines[1], dot_line_1),
+            format!("{} {}", exiting_text_lines[2], dot_line_2),
+        ];
+        let combined_text = combined_lines.join("\n");
+
+        let line1_width = combined_lines[0].chars().count() as u16;
+        let line2_width = combined_lines[1].chars().count() as u16;
+        let line3_width = combined_lines[2].chars().count() as u16;
+        let text_width = line1_width.max(line2_width).max(line3_width);
+        let text_height = 3;
+
+        let paragraph = Paragraph::new(combined_text)
+            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)));
+
+        let area = ratatui::layout::Rect::new(0, 0, text_width, text_height);
+        frame.render_widget(paragraph, area);
     }
 }

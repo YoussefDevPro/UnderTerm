@@ -70,6 +70,10 @@ pub struct GameState {
     pub esc_press_start_time: Option<Instant>,
     #[serde(skip)]
     pub debug_info: Vec<String>,
+    #[serde(skip)]
+    pub esc_hold_dots: u8,
+    #[serde(skip, default = "default_instant")]
+    pub esc_dot_timer: Instant,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -126,6 +130,8 @@ impl GameState {
             teleport_creation_state: TeleportCreationState::None,
             esc_press_start_time: None,
             debug_info: Vec::new(),
+            esc_hold_dots: 0,
+            esc_dot_timer: Instant::now(),
         }
     }
 
@@ -232,9 +238,8 @@ impl GameState {
                         .iter()
                         .find(|b| b.id == teleported_from_id)
                     {
-                        let player_rect =
-                            ratatui::layout::Rect::new(self.player.x, self.player.y, 1, 1);
-                        if !teleport_box.to_rect().intersects(player_rect) {
+                        let player_collision_rect = self.player.get_collision_rect();
+                        if !teleport_box.to_rect().intersects(player_collision_rect) {
                             self.recently_teleported_from_box_id = None;
                         }
                     } else {
@@ -287,6 +292,8 @@ impl GameState {
                                 crate::game::map::Event::TeleportPlayer {
                                     map_row,
                                     map_col,
+                                    dest_x,
+                                    dest_y,
                                 } => {
                                     let new_map_name = format!("map_{}_{}", map_row, map_col);
                                     let new_map_key = (*map_row, *map_col);
@@ -295,25 +302,31 @@ impl GameState {
                                         if let Ok(map) = crate::game::map::Map::load(&new_map_name) {
                                             loaded_map = Some(map);
                                         } else {
-                                            self.message = format!("Failed to load map: {}", new_map_name);
+                                            self.message =
+                                                format!("Failed to load map: {}", new_map_name);
                                             self.show_message = true;
                                             self.message_animation_start_time = Instant::now();
                                             self.animated_message_content.clear();
                                             break;
                                         }
                                     }
+
+                                    let map_is_available =
+                                        self.loaded_maps.contains_key(&new_map_key)
+                                            || loaded_map.is_some();
+
                                     if let Some(map) = loaded_map {
                                         map_to_insert_after_loop = Some((new_map_key, map));
                                     }
-                                    if let Some(new_map) = self.loaded_maps.get(&new_map_key) {
+
+                                    if map_is_available {
                                         teleport_destination = Some((
-                                            new_map.player_spawn.0 as u16,
-                                            new_map.player_spawn.1 as u16,
+                                            *dest_x as u16,
+                                            *dest_y as u16,
                                             *map_row,
                                             *map_col,
                                             new_map_name,
                                         ));
-                                        self.recently_teleported_from_box_id = Some(select_box.id);
                                     }
                                     break;
                                 }
@@ -339,6 +352,41 @@ impl GameState {
                 self.current_map_row = map_row;
                 self.current_map_col = map_col;
                 self.current_map_name = new_map_name;
+
+                let player_collision_rect = self.player.get_collision_rect();
+                let dest_map_key = (self.current_map_row, self.current_map_col);
+
+                let dest_map_option = if let Some((key, map)) = &map_to_insert_after_loop {
+                    if *key == dest_map_key {
+                        Some(map)
+                    } else {
+                        self.loaded_maps.get(&dest_map_key)
+                    }
+                } else {
+                    self.loaded_maps.get(&dest_map_key)
+                };
+
+                if let Some(dest_map) = dest_map_option {
+                    let mut landed_in_teleporter = false;
+                    for select_box in &dest_map.select_object_boxes {
+                        if select_box.to_rect().intersects(player_collision_rect) {
+                            let is_tp = select_box
+                                .events
+                                .iter()
+                                .any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
+                            if is_tp {
+                                self.recently_teleported_from_box_id = Some(select_box.id);
+                                landed_in_teleporter = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !landed_in_teleporter {
+                        self.recently_teleported_from_box_id = None;
+                    }
+                } else {
+                    self.recently_teleported_from_box_id = None;
+                }
             }
         }
 
@@ -367,6 +415,20 @@ impl GameState {
                     is_tp,
                     intersects
                 ));
+            }
+        }
+
+        if self.esc_press_start_time.is_some() {
+            if self.esc_dot_timer.elapsed() >= std::time::Duration::from_secs(1) {
+                if self.esc_hold_dots < 4 {
+                    self.esc_hold_dots += 1;
+                }
+                self.esc_dot_timer = Instant::now();
+            }
+        } else if self.esc_hold_dots > 0 {
+            if self.esc_dot_timer.elapsed() >= std::time::Duration::from_secs(1) {
+                self.esc_hold_dots -= 1;
+                self.esc_dot_timer = Instant::now();
             }
         }
     }

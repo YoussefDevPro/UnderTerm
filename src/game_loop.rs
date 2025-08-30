@@ -40,6 +40,12 @@ pub fn run(
                 return Ok(());
             }
 
+            if game_state.esc_hold_dots >= 4 {
+                return Ok(());
+            }
+
+            
+
             let current_frame_size = terminal.size()?;
             game_state.update(
                 &key_states,

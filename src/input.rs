@@ -9,7 +9,7 @@ use std::{
 use crossterm::event::{self, Event, KeyCode};
 use serde_json;
 
-use crate::game::config::ESC_HOLD_DURATION;
+
 use crate::game::state::{GameState, TeleportCreationState};
 
 pub fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
@@ -31,12 +31,7 @@ pub fn process_events(
     key_states: &mut HashMap<KeyCode, bool>,
     audio: &crate::audio::Audio,
 ) -> io::Result<bool> {
-    // Check for Esc hold to quit
-    if let Some(start_time) = game_state.esc_press_start_time {
-        if start_time.elapsed() >= ESC_HOLD_DURATION {
-            return Ok(true); // Quit the game
-        }
-    }
+    
 
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {
@@ -79,8 +74,13 @@ pub fn process_events(
                             game_state.show_message = true;
                             game_state.message_animation_start_time = Instant::now();
                             game_state.animated_message_content.clear();
-                        } else if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
-                            let target_map_name = game_state.teleport_destination_map_name_buffer.trim().to_string();
+                        } else if game_state.teleport_creation_state
+                            == TeleportCreationState::EnteringMapName
+                        {
+                            let target_map_name = game_state
+                                .teleport_destination_map_name_buffer
+                                .trim()
+                                .to_string();
                             if target_map_name.is_empty() {
                                 game_state.message = "Target map name cannot be empty.".to_string();
                                 game_state.show_message = true;
@@ -89,40 +89,79 @@ pub fn process_events(
                             } else {
                                 let parts: Vec<&str> = target_map_name.split('_').collect();
                                 if parts.len() == 3 && parts[0] == "map" {
-                                    if let (Ok(map_row), Ok(map_col)) = (parts[1].parse::<i32>(), parts[2].parse::<i32>()) {
-                                        if let Some(ref mut pending_box) = game_state.pending_select_box {
-                                            pending_box.events.push(
-                                                crate::game::map::Event::TeleportPlayer {
-                                                    map_row,
-                                                    map_col,
-                                                },
-                                            );
+                                    if let (Ok(map_row), Ok(map_col)) =
+                                        (parts[1].parse::<i32>(), parts[2].parse::<i32>())
+                                    {
+                                        match crate::game::map::Map::load(&target_map_name) {
+                                            Ok(target_map) => {
+                                                if let Some(pending_box) =
+                                                    &game_state.pending_select_box
+                                                {
+                                                    let current_map_key = (
+                                                        game_state.current_map_row,
+                                                        game_state.current_map_col,
+                                                    );
+                                                    if let Some(map_to_modify) = game_state
+                                                        .loaded_maps
+                                                        .get_mut(&current_map_key)
+                                                    {
+                                                        if let Some(box_to_update) = map_to_modify
+                                                            .select_object_boxes
+                                                            .iter_mut()
+                                                            .find(|b| b.id == pending_box.id)
+                                                        {
+                                                            box_to_update.events.push(
+                                                                crate::game::map::Event::TeleportPlayer {
+                                                                    map_row,
+                                                                    map_col,
+                                                                    dest_x: target_map.player_spawn.0,
+                                                                    dest_y: target_map.player_spawn.1,
+                                                                },
+                                                            );
 
-                                            let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                            if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
-                                                if let Err(e) = map_to_modify.save_data() {
-                                                    game_state.message = format!("Failed to save map data: {}", e);
+                                                            if let Err(e) = map_to_modify.save_data()
+                                                            {
+                                                                game_state.message = format!(
+                                                                    "Failed to save map data: {}",
+                                                                    e
+                                                                );
+                                                            } else {
+                                                                game_state.message = format!(
+                                                                    "Teleport event to {} added and saved.",
+                                                                    target_map_name
+                                                                );
+                                                            }
+                                                        } else {
+                                                            game_state.message = "Error: Could not find the box to update in the current map.".to_string();
+                                                        }
+                                                    } else {
+                                                        game_state.message = "Error: Current map not found for saving.".to_string();
+                                                    }
                                                 } else {
-                                                    game_state.message = format!("Teleport event to {} added and saved.", target_map_name);
+                                                    game_state.message = "Error: No pending select box to add event to.".to_string();
                                                 }
-                                            } else {
-                                                game_state.message = "Error: Current map not found for saving.".to_string();
                                             }
-
-                                            game_state.teleport_creation_state = TeleportCreationState::None;
-                                            game_state.is_text_input_active = false;
-                                            game_state.teleport_destination_map_name_buffer.clear();
-                                            game_state.pending_select_box = None;
-                                            game_state.is_drawing_select_box = false;
-                                            game_state.block_player_movement_on_message = true;
-                                        } else {
-                                            game_state.message = "Error: No pending select box to add event to.".to_string();
+                                            Err(_) => {
+                                                game_state.message = format!(
+                                                    "Failed to load map data for '{}'.",
+                                                    target_map_name
+                                                );
+                                            }
                                         }
+                                        game_state.teleport_creation_state =
+                                            TeleportCreationState::None;
+                                        game_state.is_text_input_active = false;
+                                        game_state.teleport_destination_map_name_buffer.clear();
+                                        game_state.pending_select_box = None;
+                                        game_state.is_drawing_select_box = false;
+                                        game_state.block_player_movement_on_message = true;
                                     } else {
                                         game_state.message = "Invalid map coordinates in name. Format: map_row_col".to_string();
                                     }
                                 } else {
-                                    game_state.message = "Invalid map name format. Expected: map_row_col".to_string();
+                                    game_state.message =
+                                        "Invalid map name format. Expected: map_row_col"
+                                            .to_string();
                                 }
                                 game_state.show_message = true;
                                 game_state.message_animation_start_time = Instant::now();
@@ -140,7 +179,6 @@ pub fn process_events(
                             game_state.show_message = true;
                             game_state.message_animation_start_time = Instant::now();
                             game_state.animated_message_content.clear();
-                            game_state.is_text_input_active = false;
                         }
                     }
                     KeyCode::Esc => {
@@ -158,7 +196,7 @@ pub fn process_events(
                             game_state.block_player_movement_on_message = true;
                         } else {
                             game_state.is_event_input_active = true;
-                            game_state.message = "Enter events. Format: 'teleport map_row map_col'. Esc to finish.".to_string();
+                            game_state.message = "Enter events. Format: 'teleport map_0_0'. Esc to finish.".to_string();
                         }
                         game_state.show_message = true;
                         game_state.message_animation_start_time = Instant::now();
@@ -179,23 +217,41 @@ pub fn process_events(
                         if let Some(ref mut pending_box) = game_state.pending_select_box {
                             let input = game_state.text_input_buffer.trim();
                             let parts: Vec<&str> = input.split_whitespace().collect();
-                            if parts.len() == 3 && parts[0] == "teleport" {
-                                if let (Ok(map_row), Ok(map_col)) = (
-                                    parts[1].parse(),
-                                    parts[2].parse(),
-                                ) {
-                                    pending_box.events.push(
-                                        crate::game::map::Event::TeleportPlayer {
-                                            map_row,
-                                            map_col,
-                                        },
-                                    );
-                                    game_state.message = format!(
-                                        "Teleport event added. Current: {}",
-                                        pending_box.events.len()
-                                    );
+                            if parts.len() == 2 && parts[0] == "teleport" {
+                                let target_map_name = parts[1];
+                                let map_parts: Vec<&str> = target_map_name.split('_').collect();
+                                if map_parts.len() == 3 && map_parts[0] == "map" {
+                                    if let (Ok(map_row), Ok(map_col)) =
+                                        (map_parts[1].parse(), map_parts[2].parse())
+                                    {
+                                        match crate::game::map::Map::load(target_map_name) {
+                                            Ok(target_map) => {
+                                                pending_box.events.push(
+                                                    crate::game::map::Event::TeleportPlayer {
+                                                        map_row,
+                                                        map_col,
+                                                        dest_x: target_map.player_spawn.0,
+                                                        dest_y: target_map.player_spawn.1,
+                                                    },
+                                                );
+                                                game_state.message = format!(
+                                                    "Teleport event added. Current: {}",
+                                                    pending_box.events.len()
+                                                );
+                                            }
+                                            Err(_) => {
+                                                game_state.message =
+                                                    format!("Could not load map {}", target_map_name);
+                                            }
+                                        }
+                                    } else {
+                                        game_state.message =
+                                            "Invalid map name format in teleport.".to_string();
+                                    }
                                 } else {
-                                    game_state.message = "Invalid teleport parameters.".to_string();
+                                    game_state.message =
+                                        "Invalid map name format. Expected: map_row_col"
+                                            .to_string();
                                 }
                             } else {
                                 game_state.message = "Unknown event format.".to_string();
@@ -239,6 +295,9 @@ pub fn process_events(
                 event::KeyEventKind::Press => {
                     key_states.insert(key.code, true);
                     if key.code == KeyCode::Esc {
+                        if game_state.esc_press_start_time.is_none() {
+                            game_state.esc_dot_timer = Instant::now();
+                        }
                         game_state.esc_press_start_time = Some(Instant::now());
                     }
                     if game_state.is_map_kind_selection_active {
@@ -340,6 +399,9 @@ pub fn process_events(
                 event::KeyEventKind::Release => {
                     key_states.insert(key.code, false);
                     if key.code == KeyCode::Esc {
+                        if game_state.esc_press_start_time.is_some() {
+                            game_state.esc_dot_timer = Instant::now();
+                        }
                         game_state.esc_press_start_time = None;
                     }
                     if key.code == KeyCode::Char('o') && game_state.debug_mode {

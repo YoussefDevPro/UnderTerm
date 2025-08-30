@@ -52,6 +52,8 @@ pub enum Event {
     TeleportPlayer {
         map_row: i32,
         map_col: i32,
+        dest_x: u32,
+        dest_y: u32,
     },
 }
 
