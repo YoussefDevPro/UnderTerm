@@ -1,9 +1,12 @@
+use super::deltarune::Deltarune;
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
 use ratatui::layout::Rect;
 use ratatui::text::Text;
+use ratatui::style::{Color, Style};
+use ratatui::text::{Span, Line};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
@@ -78,6 +81,7 @@ pub struct GameState {
     pub esc_hold_dots: u8,
     #[serde(skip, default = "default_instant")]
     pub esc_dot_timer: Instant,
+    pub deltarune: Deltarune,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -139,6 +143,7 @@ impl GameState {
             just_teleported: false,
             last_teleport_destination_box_id: None,
             teleport_cooldown_timer: None,
+            deltarune: Deltarune::new(),
         }
     }
 
@@ -561,12 +566,44 @@ impl GameState {
         self.message_animation_finished = true;
     }
 
-    pub fn get_combined_map_text(&self, _frame_size: Rect) -> Text<'static> {
+    pub fn get_combined_map_text(&self, _frame_size: Rect, deltarune_level: u8) -> Text<'static> {
         let current_map_key = (self.current_map_row, self.current_map_col);
         if let Some(map) = self.loaded_maps.get(&current_map_key) {
-            map.ansi_sprite.as_bytes().into_text().unwrap()
+            let original_text = map.ansi_sprite.as_bytes().into_text().unwrap();
+            let mut new_text = Text::default();
+
+            for line in original_text.lines {
+                let mut new_spans = Vec::new();
+                for span in line.spans {
+                    let mut new_style = span.style;
+                    if let Some(fg) = new_style.fg {
+                        new_style = new_style.fg(darken_color(fg, deltarune_level));
+                    }
+                    if let Some(bg) = new_style.bg {
+                        new_style = new_style.bg(darken_color(bg, deltarune_level));
+                    }
+                    new_spans.push(Span::styled(span.content, new_style));
+                }
+                new_text.lines.push(Line::from(new_spans));
+            }
+            new_text
         } else {
             Text::default()
         }
+    }
+}
+
+fn darken_color(color: Color, darkness_level: u8) -> Color {
+    let factor = 1.0 - (darkness_level as f32 / 100.0);
+    match color {
+        Color::Rgb(r, g, b) => {
+            Color::Rgb(
+                (r as f32 * factor) as u8,
+                (g as f32 * factor) as u8,
+                (b as f32 * factor) as u8,
+            )
+        }
+        // For other color types, return them as is or handle them specifically
+        _ => color,
     }
 }

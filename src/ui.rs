@@ -17,7 +17,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
     let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
-    let combined_map_text = game_state.get_combined_map_text(size);
+    let combined_map_text = game_state.get_combined_map_text(size, game_state.deltarune.level);
 
     let map_paragraph = Paragraph::new(combined_map_text)
         .scroll((game_state.camera_y, game_state.camera_x))
@@ -301,9 +301,12 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let dot_line_2 = "▀██▀ ".repeat(num_dots);
 
         let combined_lines = vec![
-            format!("{} {}", exiting_text_lines[0], dot_line_0),
-            format!("{} {}", exiting_text_lines[1], dot_line_1),
-            format!("{} {}", exiting_text_lines[2], dot_line_2),
+            format!("{}
+ {}", exiting_text_lines[0], dot_line_0),
+            format!("{}
+ {}", exiting_text_lines[1], dot_line_1),
+            format!("{}
+ {}", exiting_text_lines[2], dot_line_2),
         ];
         let combined_text = combined_lines.join("\n");
 
@@ -319,4 +322,6 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let area = ratatui::layout::Rect::new(0, 0, text_width, text_height);
         frame.render_widget(paragraph, area);
     }
+
+    
 }

@@ -241,6 +241,7 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         ),
         format!("Anim Frame Duration: {:?}", ANIMATION_FRAME_DURATION),
         format!("Map Kind: {}", map_kind),
+        format!("Darkness Level: {}", game_state.deltarune.level),
     ];
 
     debug_text.push("".to_string());

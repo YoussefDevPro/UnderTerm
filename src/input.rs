@@ -394,6 +394,10 @@ pub fn process_events(
                                 game_state.skip_message_animation();
                             }
                         }
+                    } else if key.code == KeyCode::Char('+') {
+                        game_state.deltarune.increase();
+                    } else if key.code == KeyCode::Char('-') {
+                        game_state.deltarune.decrease();
                     } else if key.code == KeyCode::Char('q') {
                         game_state.save_game_state()?;
                         return Ok(true);
