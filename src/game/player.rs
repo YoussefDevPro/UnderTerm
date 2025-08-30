@@ -53,7 +53,6 @@ pub struct PlayerUpdateContext<'a> {
     pub message_animation_start_time: &'a mut Instant,
     pub wall_history: &'a mut Vec<Vec<(u32, u32)>>,
     pub history_index: &'a mut usize,
-    pub current_map_name: &'a mut String,
     pub is_drawing_select_box: bool,
     pub block_player_movement_on_message: &'a mut bool,
 }

@@ -327,6 +327,27 @@ pub fn process_events(
                         }
                     } else if debug::input::handle_debug_input(key, game_state) {
                     } else if key.code == KeyCode::Enter {
+                        // Handle interaction with SelectObjectBox when Enter is pressed
+                        if !game_state.show_message {
+                            if let Some(box_id) = game_state.current_interaction_box_id {
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                    if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                        if !interacting_box.messages.is_empty() {
+                                            game_state.message = interacting_box.messages[0].clone();
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.animated_message_content.clear();
+                                            game_state.message_animation_finished = false;
+                                            game_state.current_message_index = 1; // Set to 1 because the first message is now displayed
+                                            game_state.block_player_movement_on_message = true;
+                                            return Ok(false); // Event handled
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if game_state.show_message {
                             if game_state.message_animation_finished {
                                 if let Some(box_id) = game_state.current_interaction_box_id {

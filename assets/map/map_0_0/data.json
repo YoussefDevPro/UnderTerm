@@ -2,7 +2,7 @@
   "map_name": "map_0_0",
   "player_spawn": [
     90,
-    36
+    35
   ],
   "walls": [
     [
@@ -3936,6 +3936,17 @@
           }
         }
       ]
+    },
+    {
+      "id": 2,
+      "x": 80,
+      "y": 40,
+      "width": 39,
+      "height": 13,
+      "messages": [
+        "useless flowers ..."
+      ],
+      "events": []
     }
   ],
   "kind": "empty"
