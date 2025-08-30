@@ -7,7 +7,10 @@ use std::time::{Duration, Instant};
 const PLAYER_COLLISION_WIDTH: u16 = 21;
 const PLAYER_COLLISION_HEIGHT: u16 = 5;
 
-use super::config::{PLAYER_HORIZONTAL_SPEED, PLAYER_SPEED};
+use super::config::{
+    PLAYER_HORIZONTAL_SPEED, PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH,
+    PLAYER_SPEED,
+};
 use super::map::Map;
 use crossterm::event::KeyCode;
 
@@ -181,6 +184,44 @@ impl Player {
         )
     }
 
+    pub fn get_interaction_rect(&self) -> ratatui::layout::Rect {
+        let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
+
+        let (select_box_x, select_box_y) = match self.direction {
+            PlayerDirection::Front => (
+                self.x
+                    .saturating_add(player_sprite_width / 2)
+                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
+                self.y.saturating_add(player_sprite_height),
+            ),
+            PlayerDirection::Back => (
+                self.x
+                    .saturating_add(player_sprite_width / 2)
+                    .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
+                self.y.saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
+            ),
+            PlayerDirection::Left => (
+                self.x.saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
+                self.y
+                    .saturating_add(player_sprite_height / 2)
+                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
+            ),
+            PlayerDirection::Right => (
+                self.x.saturating_add(player_sprite_width),
+                self.y
+                    .saturating_add(player_sprite_height / 2)
+                    .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
+            ),
+        };
+
+        ratatui::layout::Rect::new(
+            select_box_x,
+            select_box_y,
+            PLAYER_INTERACTION_BOX_WIDTH,
+            PLAYER_INTERACTION_BOX_HEIGHT,
+        )
+    }
+
     pub fn update(
         &mut self,
         context: &mut PlayerUpdateContext,
@@ -244,74 +285,6 @@ impl Player {
                 }
             }
         }
-
-        // let mut transitioned = false;
-        // let mut next_map_row = *context.current_map_row;
-        // let mut next_map_col = *context.current_map_col;
-        // if new_player_x >= current_map.width {
-        //     next_map_col += 1;
-        //     new_player_x = 0;
-        //     transitioned = true;
-        // } else if self.x == 0 && left {
-        //     if *context.current_map_col > 0 {
-        //         next_map_col -= 1;
-        //         new_player_x = current_map.width - 1;
-        //         transitioned = true;
-        //     } else {
-        //         new_player_x = 0;
-        //     }
-        // if new_player_y >= current_map.height {
-        //     next_map_row += 1;
-        //     new_player_y = 0;
-        //     transitioned = true;
-        // } else if self.y == 0 && up {
-        //     if *context.current_map_row > 0 {
-        //         next_map_row -= 1;
-        //         new_player_y = current_map.height - 1;
-        //         transitioned = true;
-        //     } else {
-        //         new_player_y = 0;
-        //     }
-        // }
-        // if transitioned {
-        //     let new_map_name = format!("map_{}_{}", next_map_row, next_map_col);
-        //     let new_map_key = (next_map_row, next_map_col);
-        //     let map_path = std::path::Path::new("assets/map").join(&new_map_name).join("data.json");
-        //     if !map_path.exists() {
-        //         *context.message = format!("Cannot enter {}", new_map_name);
-        //         *context.show_message = true;
-        //         *context.message_animation_start_time = Instant::now();
-        //         context.animated_message_content.clear();
-        //         self.x = original_player_x;
-        //         self.y = original_player_y;
-        //         return;
-        //     }
-        //     if !context.loaded_maps.contains_key(&new_map_key) {
-        //         match Map::load(&new_map_name) {
-        //             Ok(new_map) => {
-        //                 context.loaded_maps.insert(new_map_key, new_map);
-        //             }
-        //             Err(e) => {
-        //                 *context.message = format!("Cannot enter {}: {}", new_map_name, e);
-        //                 *context.show_message = true;
-        //                 *context.message_animation_start_time = Instant::now();
-        //                 context.animated_message_content.clear();
-        //                 self.x = original_player_x;
-        //                 self.y = original_player_y;
-        //                 return;
-        //             }
-        //         }
-        //     }
-        //     *context.current_map_name = new_map_name;
-        //     *context.current_map_row = next_map_row;
-        //     *context.current_map_col = next_map_col;
-        //     self.x = new_player_x;
-        //     self.y = new_player_y;
-        //     *context.message = format!("Entered {}", *context.current_map_name);
-        //     *context.show_message = true;
-        //     *context.message_animation_start_time = Instant::now();
-        //     context.animated_message_content.clear();
-        // }
 
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 

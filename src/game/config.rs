@@ -4,4 +4,7 @@ pub const PLAYER_SPEED: u16 = 1;
 pub const PLAYER_HORIZONTAL_SPEED: u16 = 2;
 pub const FRAME_RATE: u64 = 120;
 pub const ANIMATION_FRAME_DURATION: Duration = Duration::from_millis(200);
+pub const PLAYER_INTERACTION_BOX_WIDTH: u16 = 30;
+pub const PLAYER_INTERACTION_BOX_HEIGHT: u16 = 20;
+pub const TELEPORT_COOLDOWN_DURATION: Duration = Duration::from_millis(500);
 

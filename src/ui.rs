@@ -9,8 +9,7 @@ use ratatui::{
     Frame,
 };
 
-const PLAYER_INTERACTION_BOX_WIDTH: u16 = 30;
-const PLAYER_INTERACTION_BOX_HEIGHT: u16 = 20;
+
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
@@ -31,58 +30,16 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         if let crate::game::map::MapKind::Objects = current_map.kind {
-            let (_player_sprite_content, player_sprite_width, player_sprite_height) =
-                game_state.player.get_sprite_content();
+            let interaction_rect = game_state.player.get_interaction_rect();
 
-            let (select_box_x, select_box_y) = match game_state.player.direction {
-                crate::game::player::PlayerDirection::Front => (
-                    game_state
-                        .player
-                        .x
-                        .saturating_add(player_sprite_width / 2)
-                        .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
-                    game_state.player.y.saturating_add(player_sprite_height),
-                ),
-                crate::game::player::PlayerDirection::Back => (
-                    game_state
-                        .player
-                        .x
-                        .saturating_add(player_sprite_width / 2)
-                        .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
-                    game_state
-                        .player
-                        .y
-                        .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
-                ),
-                crate::game::player::PlayerDirection::Left => (
-                    game_state
-                        .player
-                        .x
-                        .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
-                    game_state
-                        .player
-                        .y
-                        .saturating_add(player_sprite_height / 2)
-                        .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
-                ),
-                crate::game::player::PlayerDirection::Right => (
-                    game_state.player.x.saturating_add(player_sprite_width),
-                    game_state
-                        .player
-                        .y
-                        .saturating_add(player_sprite_height / 2)
-                        .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
-                ),
-            };
-
-            let select_box_x_on_screen = select_box_x.saturating_sub(game_state.camera_x);
-            let select_box_y_on_screen = select_box_y.saturating_sub(game_state.camera_y);
+            let select_box_x_on_screen = interaction_rect.x.saturating_sub(game_state.camera_x);
+            let select_box_y_on_screen = interaction_rect.y.saturating_sub(game_state.camera_y);
 
             let draw_rect = ratatui::layout::Rect::new(
                 select_box_x_on_screen,
                 select_box_y_on_screen,
-                PLAYER_INTERACTION_BOX_WIDTH,
-                PLAYER_INTERACTION_BOX_HEIGHT,
+                interaction_rect.width,
+                interaction_rect.height,
             );
 
             let clamped_rect = draw_rect.intersection(size);

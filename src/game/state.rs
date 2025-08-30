@@ -61,10 +61,14 @@ pub struct GameState {
     #[serde(skip)]
     pub history_index: usize,
     pub is_creating_map: bool,
-    pub last_teleport_origin: Option<(u32, u32, i32, i32)>,
+    pub last_teleport_origin: Option<(u32, u32, i32, i32, u32)>,
     pub recently_teleported_from_box_id: Option<u32>,
     pub teleport_creation_state: TeleportCreationState,
     pub teleport_destination_map_name_buffer: String,
+    pub just_teleported: bool,
+    pub last_teleport_destination_box_id: Option<u32>,
+    #[serde(skip)]
+    pub teleport_cooldown_timer: Option<Instant>,
 
     #[serde(skip)]
     pub esc_press_start_time: Option<Instant>,
@@ -132,6 +136,9 @@ impl GameState {
             debug_info: Vec::new(),
             esc_hold_dots: 0,
             esc_dot_timer: Instant::now(),
+            just_teleported: false,
+            last_teleport_destination_box_id: None,
+            teleport_cooldown_timer: None,
         }
     }
 
@@ -225,28 +232,68 @@ impl GameState {
             block_player_movement_on_message: &mut self.block_player_movement_on_message,
         };
 
+        let player_interaction_rect = self.player.get_interaction_rect();
+        let player_collision_rect = self.player.get_collision_rect();
+
+        
+
         if !(*context.show_message && *context.block_player_movement_on_message) {
             self.player
                 .update(&mut context, key_states, animation_frame_duration);
 
-            if let Some(teleported_from_id) = self.recently_teleported_from_box_id {
-                let current_map_key = (self.current_map_row, self.current_map_col);
-                if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
-                    if let Some(teleport_box) = current_map
+            if let Some((_x, _y, origin_map_row, origin_map_col, origin_box_id)) = self.last_teleport_origin {
+                let origin_map_key = (origin_map_row, origin_map_col);
+                if let Some(origin_map) = self.loaded_maps.get(&origin_map_key) {
+                    if let Some(teleport_box) = origin_map
                         .select_object_boxes
                         .iter()
-                        .find(|b| b.id == teleported_from_id)
+                        .find(|b| b.id == origin_box_id)
                     {
                         let player_collision_rect = self.player.get_collision_rect();
                         if !teleport_box.to_rect().intersects(player_collision_rect) {
                             self.recently_teleported_from_box_id = None;
+                            self.last_teleport_origin = None; // Clear origin once out of the box
                         }
                     } else {
                         self.recently_teleported_from_box_id = None;
+                        self.last_teleport_origin = None;
                     }
                 } else {
                     self.recently_teleported_from_box_id = None;
+                    self.last_teleport_origin = None;
                 }
+            }
+        }
+
+        // Reset just_teleported flag if player is no longer in the destination teleport zone
+        if self.just_teleported {
+            if let Some(dest_box_id) = self.last_teleport_destination_box_id {
+                let current_map_key = (self.current_map_row, self.current_map_col);
+                if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
+                    if let Some(dest_teleport_box) = current_map
+                        .select_object_boxes
+                        .iter()
+                        .find(|b| b.id == dest_box_id)
+                    {
+                        let player_collision_rect = self.player.get_collision_rect();
+                        if !dest_teleport_box.to_rect().intersects(player_collision_rect) {
+                            self.just_teleported = false;
+                            self.last_teleport_destination_box_id = None; // Clear destination box ID
+                            self.teleport_cooldown_timer = Some(Instant::now()); // Start cooldown
+                        }
+                    } else {
+                        // Destination box not found in current map, clear flag
+                        self.just_teleported = false;
+                        self.last_teleport_destination_box_id = None;
+                    }
+                } else {
+                    // Current map not loaded, clear flag
+                    self.just_teleported = false;
+                    self.last_teleport_destination_box_id = None;
+                }
+            } else {
+                // No destination box ID, clear flag
+                self.just_teleported = false;
             }
         }
 
@@ -273,140 +320,103 @@ impl GameState {
 
         let mut map_to_insert_after_loop: Option<((i32, i32), Map)> = None;
 
-        if !self.debug_mode {
-            let player_collision_rect = self.player.get_collision_rect();
-            let mut teleport_destination: Option<(u16, u16, i32, i32, String)> = None;
+        let mut teleport_destination: Option<(u16, u16, i32, i32, String, u32)> = None;
             let mut interacting_with_box_this_frame = false;
             if let Some(current_map) = self
                 .loaded_maps
                 .get(&(self.current_map_row, self.current_map_col))
             {
                 for select_box in &current_map.select_object_boxes {
-                    if select_box.to_rect().intersects(player_collision_rect) {
+                    // Handle messages based on interaction_rect
+                    if select_box.to_rect().intersects(player_interaction_rect) {
                         interacting_with_box_this_frame = true;
 
                         if self.recently_teleported_from_box_id == Some(select_box.id) {
+                            // If we just teleported from this box, don't re-trigger messages
+                            // but allow teleportation if collision box is still in it
+                            if select_box.to_rect().intersects(player_collision_rect) {
+                                for event in &select_box.events {
+                                    if let crate::game::map::Event::TeleportPlayer { .. } = event {
+                                        // This is a teleport box, and we are still in it with collision
+                                        // No need to re-teleport, just ensure we don't trigger messages
+                                        // if we are already past them.
+                                    }
+                                }
+                            }
                             continue;
                         }
 
-                        // If we are already interacting with this box, don't re-trigger messages
                         if self.current_interaction_box_id == Some(select_box.id) {
-                            // If messages are exhausted, check for events
-                            if self.current_message_index >= select_box.messages.len() {
-                                for event in &select_box.events {
-                                    match event {
-                                        crate::game::map::Event::TeleportPlayer {
-                                            map_row,
-                                            map_col,
-                                            dest_x,
-                                            dest_y,
-                                        } => {
-                                            let new_map_name = format!("map_{}_{}", map_row, map_col);
-                                            let new_map_key = (*map_row, *map_col);
-                                            let mut loaded_map: Option<Map> = None;
-                                            if !self.loaded_maps.contains_key(&new_map_key) {
-                                                if let Ok(map) = crate::game::map::Map::load(&new_map_name) {
-                                                    loaded_map = Some(map);
-                                                } else {
-                                                    self.message =
-                                                        format!("Failed to load map: {}", new_map_name);
-                                                    self.show_message = true;
-                                                    self.message_animation_start_time = Instant::now();
-                                                    self.animated_message_content.clear();
-                                                    break;
-                                                }
-                                            }
-
-                                            let map_is_available =
-                                                self.loaded_maps.contains_key(&new_map_key)
-                                                    || loaded_map.is_some();
-
-                                            if let Some(map) = loaded_map {
-                                                map_to_insert_after_loop = Some((new_map_key, map));
-                                            }
-
-                                            if map_is_available {
-                                                teleport_destination = Some((
-                                                    *dest_x as u16,
-                                                    *dest_y as u16,
-                                                    *map_row,
-                                                    *map_col,
-                                                    new_map_name,
-                                                ));
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            // If a teleport event was found, break from this inner loop
-                            if teleport_destination.is_some() {
-                                break;
-                            }
-                            continue; // Already interacting, no new message to show
-                        }
-
-                        // New interaction or interaction with a different box
-                        if !select_box.messages.is_empty() {
+                            // Already interacting, messages handled by input.rs
+                        } else if !select_box.messages.is_empty() {
                             self.current_interaction_box_id = Some(select_box.id);
                             self.current_message_index = 0;
                             // Messages will be displayed on Enter key press
-                            // self.message = select_box.messages[0].clone();
-                            // self.show_message = true;
-                            // self.message_animation_start_time = Instant::now();
-                            // self.animated_message_content.clear();
-                            // self.block_player_movement_on_message = true;
-                            // break; // Found an interaction with messages, stop checking other boxes
-                        } else {
-                            // If no messages, check for events immediately
-                            for event in &select_box.events {
-                                match event {
-                                    crate::game::map::Event::TeleportPlayer {
-                                        map_row,
-                                        map_col,
-                                        dest_x,
-                                        dest_y,
-                                    } => {
-                                        let new_map_name = format!("map_{}_{}", map_row, map_col);
-                                        let new_map_key = (*map_row, *map_col);
-                                        let mut loaded_map: Option<Map> = None;
-                                        if !self.loaded_maps.contains_key(&new_map_key) {
-                                            if let Ok(map) = crate::game::map::Map::load(&new_map_name) {
-                                                loaded_map = Some(map);
-                                            } else {
-                                                self.message =
-                                                    format!("Failed to load map: {}", new_map_name);
-                                                self.show_message = true;
-                                                self.message_animation_start_time = Instant::now();
-                                                self.animated_message_content.clear();
-                                                break;
-                                            }
-                                        }
+                        }
+                    }
 
-                                        let map_is_available =
-                                            self.loaded_maps.contains_key(&new_map_key)
-                                                || loaded_map.is_some();
+                    // Handle teleportation based on collision_rect
+                    if select_box.to_rect().intersects(player_collision_rect) {
+                        if self.just_teleported {
+                            continue; // Just teleported, ignore this zone for now
+                        }
+                        if let Some(timer) = self.teleport_cooldown_timer {
+                            if timer.elapsed() < crate::game::config::TELEPORT_COOLDOWN_DURATION {
+                                continue; // Still in cooldown
+                            }
+                        }
+                        if self.recently_teleported_from_box_id == Some(select_box.id) {
+                            continue; // Already teleported from this box, prevent immediate re-teleport
+                        }
 
-                                        if let Some(map) = loaded_map {
-                                            map_to_insert_after_loop = Some((new_map_key, map));
+                        for event in &select_box.events {
+                            match event {
+                                crate::game::map::Event::TeleportPlayer {
+                                    map_row,
+                                    map_col,
+                                    dest_x,
+                                    dest_y,
+                                } => {
+                                    let new_map_name = format!("map_{}_{}", map_row, map_col);
+                                    let new_map_key = (*map_row, *map_col);
+                                    let mut loaded_map: Option<Map> = None;
+                                    if !self.loaded_maps.contains_key(&new_map_key) {
+                                        if let Ok(map) = crate::game::map::Map::load(&new_map_name)
+                                        {
+                                            loaded_map = Some(map);
+                                        } else {
+                                            self.message =
+                                                format!("Failed to load map: {}", new_map_name);
+                                            self.show_message = true;
+                                            self.message_animation_start_time = Instant::now();
+                                            self.animated_message_content.clear();
+                                            break;
                                         }
-
-                                        if map_is_available {
-                                            teleport_destination = Some((
-                                                *dest_x as u16,
-                                                *dest_y as u16,
-                                                *map_row,
-                                                *map_col,
-                                                new_map_name,
-                                            ));
-                                        }
-                                        break;
                                     }
+
+                                    let map_is_available = self.loaded_maps.contains_key(&new_map_key)
+                                        || loaded_map.is_some();
+
+                                    if let Some(map) = loaded_map {
+                                        map_to_insert_after_loop = Some((new_map_key, map));
+                                    }
+
+                                    if map_is_available {
+                                        teleport_destination = Some((
+                                            *dest_x as u16,
+                                            *dest_y as u16,
+                                            *map_row,
+                                            *map_col,
+                                            new_map_name,
+                                            select_box.id,
+                                        ));
+                                    }
+                                    break;
                                 }
                             }
-                            if teleport_destination.is_some() {
-                                break;
-                            }
+                        }
+                        if teleport_destination.is_some() {
+                            break; // Teleport event found, stop checking other boxes
                         }
                     }
                 }
@@ -418,12 +428,13 @@ impl GameState {
                 self.current_message_index = 0; // Reset message index
             }
 
-            if let Some((x, y, map_row, map_col, new_map_name)) = teleport_destination {
+            if let Some((x, y, map_row, map_col, new_map_name, box_id)) = teleport_destination {
                 self.last_teleport_origin = Some((
                     self.player.x as u32,
                     self.player.y as u32,
                     self.current_map_row,
                     self.current_map_col,
+                    box_id,
                 ));
 
                 self.player.x = x;
@@ -432,7 +443,6 @@ impl GameState {
                 self.current_map_col = map_col;
                 self.current_map_name = new_map_name;
 
-                let player_collision_rect = self.player.get_collision_rect();
                 let dest_map_key = (self.current_map_row, self.current_map_col);
 
                 let dest_map_option = if let Some((key, map)) = &map_to_insert_after_loop {
@@ -449,10 +459,9 @@ impl GameState {
                     let mut landed_in_teleporter = false;
                     for select_box in &dest_map.select_object_boxes {
                         if select_box.to_rect().intersects(player_collision_rect) {
-                            let is_tp = select_box
-                                .events
-                                .iter()
-                                .any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
+                            let is_tp = select_box.events.iter().any(|e| {
+                                matches!(e, crate::game::map::Event::TeleportPlayer { .. })
+                            });
                             if is_tp {
                                 self.recently_teleported_from_box_id = Some(select_box.id);
                                 landed_in_teleporter = true;
@@ -466,48 +475,43 @@ impl GameState {
                 } else {
                     self.recently_teleported_from_box_id = None;
                 }
+                self.just_teleported = true; // Set flag after teleport
+                self.last_teleport_destination_box_id = Some(box_id); // Set destination box ID
             }
-        }
 
         if let Some((key, map)) = map_to_insert_after_loop {
             self.loaded_maps.insert(key, map);
         }
 
-        self.debug_info.clear();
-        let player_collision_rect = self.player.get_collision_rect();
-        self.debug_info
-            .push(format!("Player Collision Box: {:?}", player_collision_rect));
-        if let Some(current_map) = self
-            .loaded_maps
-            .get(&(self.current_map_row, self.current_map_col))
-        {
-            for select_box in &current_map.select_object_boxes {
-                let intersects = select_box.to_rect().intersects(player_collision_rect);
-                let is_tp = select_box
-                    .events
-                    .iter()
-                    .any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
-                self.debug_info.push(format!(
-                    "Box ID {}: {:?}, TP: {}, Intersects: {}",
-                    select_box.id,
-                    select_box.to_rect(),
-                    is_tp,
-                    intersects
-                ));
-            }
-        }
-
-        if self.esc_press_start_time.is_some() {
-            if self.esc_dot_timer.elapsed() >= std::time::Duration::from_secs(1) {
-                if self.esc_hold_dots < 4 {
-                    self.esc_hold_dots += 1;
+        if self.debug_mode {
+            self.debug_info.clear();
+            self.debug_info.push(format!(
+                "Player Interaction Box: {:?}",
+                player_interaction_rect
+            ));
+            self.debug_info
+                .push(format!("Player Collision Box: {:?}", player_collision_rect));
+            if let Some(current_map) = self
+                .loaded_maps
+                .get(&(self.current_map_row, self.current_map_col))
+            {
+                for select_box in &current_map.select_object_boxes {
+                    let intersects_interaction =
+                        select_box.to_rect().intersects(player_interaction_rect);
+                    let intersects_collision = select_box.to_rect().intersects(player_collision_rect);
+                    let is_tp = select_box
+                        .events
+                        .iter()
+                        .any(|e| matches!(e, crate::game::map::Event::TeleportPlayer { .. }));
+                    self.debug_info.push(format!(
+                        "Box ID {}: {:?}, TP: {}, Intersects Interaction: {}, Intersects Collision: {}",
+                        select_box.id,
+                        select_box.to_rect(),
+                        is_tp,
+                        intersects_interaction,
+                        intersects_collision
+                    ));
                 }
-                self.esc_dot_timer = Instant::now();
-            }
-        } else if self.esc_hold_dots > 0 {
-            if self.esc_dot_timer.elapsed() >= std::time::Duration::from_secs(1) {
-                self.esc_hold_dots -= 1;
-                self.esc_dot_timer = Instant::now();
             }
         }
     }
