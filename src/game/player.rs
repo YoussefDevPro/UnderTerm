@@ -1,4 +1,10 @@
+use super::config::{
+    ANIMATION_FRAME_DURATION, DEBUG_MOVEMENT_FRAME_INTERVAL, PLAYER_HORIZONTAL_SPEED,
+    PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH, PLAYER_SPEED,
+};
+use super::map::Map;
 use ansi_to_tui::IntoText;
+use crossterm::event::KeyCode;
 use ratatui::text::Text;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -6,13 +12,6 @@ use std::time::{Duration, Instant};
 
 const PLAYER_COLLISION_WIDTH: u16 = 21;
 const PLAYER_COLLISION_HEIGHT: u16 = 5;
-
-use super::config::{
-    PLAYER_HORIZONTAL_SPEED, PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH,
-    PLAYER_SPEED,
-};
-use super::map::Map;
-use crossterm::event::KeyCode;
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -47,6 +46,7 @@ pub struct Player {
     pub walking_stop_timer: Instant,
     #[serde(skip, default = "default_walking_stop_delay")]
     pub walking_stop_delay: Duration,
+    pub movement_counter: u8,
 }
 
 pub struct PlayerUpdateContext<'a> {
@@ -75,6 +75,7 @@ impl Player {
             animation_timer: Instant::now(),
             walking_stop_timer: Instant::now(),
             walking_stop_delay: Duration::from_millis(100),
+            movement_counter: 0,
         }
     }
 
@@ -233,7 +234,7 @@ impl Player {
         &mut self,
         context: &mut PlayerUpdateContext,
         key_states: &HashMap<KeyCode, bool>,
-        animation_frame_duration: Duration,
+        delta_time: Duration,
     ) {
         let current_map_key = (*context.current_map_row, *context.current_map_col);
         let current_map = context.loaded_maps.get(&current_map_key).cloned().unwrap();
@@ -266,19 +267,47 @@ impl Player {
             self.direction = PlayerDirection::Right;
         }
 
-        let move_speed = if context.debug_mode { 1.0 } else { PLAYER_SPEED };
-        let horizontal_move_speed = if context.debug_mode { 1.0 } else { PLAYER_HORIZONTAL_SPEED };
+        if context.debug_mode {
+            self.movement_counter = self.movement_counter.wrapping_add(1);
+            if self.movement_counter % DEBUG_MOVEMENT_FRAME_INTERVAL == 0 {
+                if up && !down {
+                    new_player_y -= 1.0;
+                } else if down && !up {
+                    new_player_y += 1.0;
+                } else if left && !right {
+                    new_player_x -= 1.0;
+                } else if right && !left {
+                    new_player_x += 1.0;
+                }
+            }
+        } else {
+            let y_mov = if up && !down {
+                -PLAYER_SPEED
+            } else if down && !up {
+                PLAYER_SPEED
+            } else {
+                0.0
+            };
 
-        if up && !down {
-            new_player_y -= move_speed;
-        } else if down && !up {
-            new_player_y += move_speed;
-        }
+            let x_mov = if left && !right {
+                -PLAYER_HORIZONTAL_SPEED
+            } else if right && !left {
+                PLAYER_HORIZONTAL_SPEED
+            } else {
+                0.0
+            };
 
-        if left && !right {
-            new_player_x -= horizontal_move_speed;
-        } else if right && !left {
-            new_player_x += horizontal_move_speed;
+            let (final_x_mov, final_y_mov) = if x_mov != 0.0 && y_mov != 0.0 {
+                (
+                    x_mov * (1.0 / (2.0 as f32).sqrt()),
+                    y_mov * (1.0 / (2.0 as f32).sqrt()),
+                )
+            } else {
+                (x_mov, y_mov)
+            };
+
+            new_player_x += final_x_mov * delta_time.as_secs_f32();
+            new_player_y += final_y_mov * delta_time.as_secs_f32();
         }
 
         if *key_states.get(&KeyCode::Char('w')).unwrap_or(&false) {
@@ -356,6 +385,6 @@ impl Player {
             }
         }
 
-        self.update_animation(animation_frame_duration);
+        self.update_animation(ANIMATION_FRAME_DURATION);
     }
 }

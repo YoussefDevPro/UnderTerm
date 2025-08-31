@@ -34,6 +34,7 @@ pub fn run(
     loop {
         let elapsed_time = last_frame_time.elapsed();
         if elapsed_time >= Duration::from_millis(1000 / FRAME_RATE) {
+            let delta_time = last_frame_time.elapsed();
             last_frame_time = Instant::now();
 
             if input::process_events(&rx, game_state, &mut key_states, &audio)? {
@@ -44,8 +45,6 @@ pub fn run(
                 return Ok(());
             }
 
-            
-
             let current_frame_size = terminal.size()?;
             game_state.update(
                 &key_states,
@@ -55,7 +54,7 @@ pub fn run(
                     current_frame_size.width,
                     current_frame_size.height,
                 ),
-                crate::game::config::ANIMATION_FRAME_DURATION,
+                delta_time,
             );
 
             terminal.draw(|frame| {
