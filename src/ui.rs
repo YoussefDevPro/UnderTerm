@@ -319,7 +319,9 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let paragraph = Paragraph::new(combined_text)
             .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)));
 
-        let area = ratatui::layout::Rect::new(0, 0, text_width, text_height);
+        let x = (size.width.saturating_sub(text_width)) / 2;
+        let y = (size.height.saturating_sub(text_height)) / 2;
+        let area = ratatui::layout::Rect::new(x, y, text_width, text_height);
         frame.render_widget(paragraph, area);
     }
 
