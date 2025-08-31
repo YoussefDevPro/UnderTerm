@@ -124,11 +124,60 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let actual_height = (height as i32 - offset_y).max(0) as u16;
 
         let darkened_sprite = game_state.darken_text(text, game_state.deltarune.level);
-        let paragraph = Paragraph::new(darkened_sprite).scroll((offset_y as u16, offset_x as u16));
-        let potential_render_rect =
-            ratatui::layout::Rect::new(draw_x, draw_y, actual_width, actual_height);
+        let paragraph = Paragraph::new(darkened_sprite)
+            .scroll((offset_y as u16, offset_x as u16)); // Apply scrolling
+
+        // Create the Rect for rendering
+        let potential_render_rect = ratatui::layout::Rect::new(draw_x, draw_y, actual_width, actual_height);
+
+        // Clip the render_rect against the frame's area
         let final_render_rect = potential_render_rect.intersection(frame.area());
-        frame.render_widget(paragraph, final_render_rect);
+
+        // If the final render rect is empty, skip drawing
+        if final_render_rect.is_empty() {
+            continue;
+        }
+
+        // Create a temporary buffer to render the paragraph into
+        let mut temp_buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, final_render_rect.width, final_render_rect.height));
+        paragraph.render(ratatui::layout::Rect::new(0, 0, final_render_rect.width, final_render_rect.height), &mut temp_buffer);
+
+        // Iterate over the cells of the temporary buffer and draw them to the frame buffer
+        for y_temp in 0..final_render_rect.height {
+            for x_temp in 0..final_render_rect.width {
+                let cell = temp_buffer.get(x_temp, y_temp);
+
+                // Calculate the absolute screen coordinates
+                let screen_x = final_render_rect.x + x_temp;
+                let screen_y = final_render_rect.y + y_temp;
+
+                // Apply the condition: if cell is a space AND its background is Color::Reset, skip drawing
+                if cell.symbol() == " " && cell.bg == ratatui::style::Color::Reset {
+                    continue;
+                }
+
+                // Get the cell from the main frame buffer
+                let frame_cell = frame.buffer_mut().get_mut(screen_x, screen_y);
+
+                // Copy the symbol and foreground color
+                frame_cell.set_symbol(cell.symbol());
+                frame_cell.set_fg(cell.fg);
+
+                // Handle background color:
+                // If the sprite cell's background is NOT reset, use it.
+                // If it IS reset, and the sprite cell has a symbol,
+                // then we want to preserve the underlying background.
+                // This prevents "reset" backgrounds from overwriting existing backgrounds
+                // when there's a character on top.
+                if cell.bg != ratatui::style::Color::Reset {
+                    frame_cell.set_bg(cell.bg);
+                }
+                // If cell.bg IS Color::Reset, we do nothing to frame_cell.bg,
+                // effectively preserving the underlying background.
+
+                frame_cell.modifier = cell.modifier;
+            }
+        }
     }
 
     if game_state.debug_mode {
