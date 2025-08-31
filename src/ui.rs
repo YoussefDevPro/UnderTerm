@@ -60,7 +60,10 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         } else {
             game_state.player.get_sprite_content()
         };
-    let player_paragraph = Paragraph::new(player_sprite_content);
+
+    let darkened_player_sprite =
+        game_state.darken_text(player_sprite_content, game_state.deltarune.level);
+    let player_paragraph = Paragraph::new(darkened_player_sprite);
 
     let player_draw_rect = ratatui::layout::Rect::new(
         player_x_on_screen,

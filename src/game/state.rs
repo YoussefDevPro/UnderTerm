@@ -630,27 +630,30 @@ impl GameState {
         self.message_animation_finished = true;
     }
 
+    pub fn darken_text(&self, original_text: Text<'static>, darkness_level: u8) -> Text<'static> {
+        let mut new_text = Text::default();
+        for line in original_text.lines {
+            let mut new_spans = Vec::new();
+            for span in line.spans {
+                let mut new_style = span.style;
+                if let Some(fg) = new_style.fg {
+                    new_style = new_style.fg(darken_color(fg, darkness_level));
+                }
+                if let Some(bg) = new_style.bg {
+                    new_style = new_style.bg(darken_color(bg, darkness_level));
+                }
+                new_spans.push(Span::styled(span.content, new_style));
+            }
+            new_text.lines.push(Line::from(new_spans));
+        }
+        new_text
+    }
+
     pub fn get_combined_map_text(&self, _frame_size: Rect, deltarune_level: u8) -> Text<'static> {
         let current_map_key = (self.current_map_row, self.current_map_col);
         if let Some(map) = self.loaded_maps.get(&current_map_key) {
             let original_text = map.ansi_sprite.as_bytes().into_text().unwrap();
-            let mut new_text = Text::default();
-
-            for line in original_text.lines {
-                let mut new_spans = Vec::new();
-                for span in line.spans {
-                    let mut new_style = span.style;
-                    if let Some(fg) = new_style.fg {
-                        new_style = new_style.fg(darken_color(fg, deltarune_level));
-                    }
-                    if let Some(bg) = new_style.bg {
-                        new_style = new_style.bg(darken_color(bg, deltarune_level));
-                    }
-                    new_spans.push(Span::styled(span.content, new_style));
-                }
-                new_text.lines.push(Line::from(new_spans));
-            }
-            new_text
+            self.darken_text(original_text, deltarune_level)
         } else {
             Text::default()
         }
