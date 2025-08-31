@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
 use std::time::{Duration, Instant};
+use crate::game::map::PlacedSprite;
+use rand::Rng;
+use rand::thread_rng;
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -43,10 +46,12 @@ pub struct GameState {
     pub animated_message_content: String,
     #[serde(skip, default = "default_instant")]
     pub message_animation_start_time: Instant,
-    #[serde(skip, default = "default_duration")]
-    pub message_animation_speed: Duration,
+    #[serde(skip)]
+    pub message_animation_interval: Duration,
     #[serde(skip)]
     pub message_animation_finished: bool,
+    #[serde(skip)]
+    pub previous_chars_shown: usize,
     pub sound_error: Option<String>,
     #[serde(skip)]
     pub loaded_maps: std::collections::HashMap<(i32, i32), Map>,
@@ -63,6 +68,8 @@ pub struct GameState {
     pub pending_select_box: Option<crate::game::map::SelectObjectBox>,
     pub is_event_input_active: bool,
     pub is_map_kind_selection_active: bool,
+    pub is_placing_sprite: bool,
+    pub pending_placed_sprite: Option<crate::game::map::PlacedSprite>,
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -122,8 +129,9 @@ impl GameState {
             show_message: false,
             animated_message_content: String::new(),
             message_animation_start_time: Instant::now(),
-            message_animation_speed: Duration::from_millis(50),
+            message_animation_interval: Duration::from_millis(thread_rng().gen_range(50..=100)),
             message_animation_finished: false,
+            previous_chars_shown: 0,
             current_map_name: format!("map_{}_{}", current_map_row, current_map_col),
             loaded_maps,
             debug_mode: false,
@@ -139,6 +147,8 @@ impl GameState {
             pending_select_box: None,
             is_event_input_active: false,
             is_map_kind_selection_active: false,
+            is_placing_sprite: false,
+            pending_placed_sprite: None,
             sound_error: None,
             current_map_row,
             current_map_col,
@@ -203,6 +213,8 @@ impl GameState {
         self.animated_message_content.clear();
         self.message_animation_finished = false;
         self.block_player_movement_on_message = false;
+        self.previous_chars_shown = 0;
+        self.message_animation_start_time = Instant::now();
     }
 
     pub fn update(
@@ -210,6 +222,7 @@ impl GameState {
         key_states: &HashMap<KeyCode, bool>,
         frame_size: ratatui::layout::Rect,
         delta_time: std::time::Duration,
+        audio: &crate::audio::Audio,
     ) {
         if self.show_message && self.message.is_empty() {
             self.dismiss_message();
@@ -224,12 +237,21 @@ impl GameState {
         }
 
         if self.show_message {
-            let elapsed = self.message_animation_start_time.elapsed();
-            let chars_to_show =
-                (elapsed.as_millis() / self.message_animation_speed.as_millis()) as usize;
-            self.animated_message_content = self.message.chars().take(chars_to_show).collect();
+            if self.message_animation_start_time.elapsed() >= self.message_animation_interval {
+                let current_len = self.animated_message_content.chars().count();
+                if current_len < self.message.chars().count() {
+                    let next_char_index = self.animated_message_content.chars().count();
+                    self.animated_message_content.push(self.message.chars().nth(next_char_index).unwrap());
+                    audio.play_text_sound();
+                    self.message_animation_interval = Duration::from_millis(thread_rng().gen_range(50..=100));
+                    self.message_animation_start_time = Instant::now();
+                } else {
+                    self.message_animation_finished = true;
+                }
+            }
         } else {
             self.animated_message_content.clear();
+            self.previous_chars_shown = 0;
         }
 
         if self.animated_message_content.len() == self.message.len() {
@@ -251,6 +273,7 @@ impl GameState {
             history_index: &mut self.history_index,
             is_drawing_select_box: self.is_drawing_select_box,
             block_player_movement_on_message: &mut self.block_player_movement_on_message,
+            is_placing_sprite: self.is_placing_sprite,
         };
 
         let player_interaction_rect = self.player.get_interaction_rect();
@@ -258,6 +281,7 @@ impl GameState {
 
         if !(*context.show_message && *context.block_player_movement_on_message)
             && self.teleport_state == TeleportState::None
+            && !self.is_placing_sprite
         {
             self.player.update(&mut context, key_states, delta_time);
 

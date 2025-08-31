@@ -1,6 +1,8 @@
 use crate::debug;
+use crate::game::map::PlacedSprite;
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
+use ratatui::text::Text;
 
 use ratatui::{
     buffer::Buffer,
@@ -10,14 +12,10 @@ use ratatui::{
     Frame,
 };
 
-
-
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
     frame.render_widget(Block::default().bg(Color::Black), size);
 
-    let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
-    let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
     let combined_map_text = game_state.get_combined_map_text(size, game_state.deltarune.level);
 
     let map_paragraph = Paragraph::new(combined_map_text)
@@ -55,42 +53,58 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         }
     }
 
+    let mut drawable_elements: Vec<(u16, u8, Text<'static>, u16, u16, u16, u16)> = Vec::new(); // (y_sort_key, z_index, ansi_content, x, y, width, height) ദ്ദി/ᐠ｡‸｡ᐟ\
+
     let (player_sprite_content, player_sprite_width, player_sprite_height) =
-        if game_state.debug_mode {
-            ("P".to_string().as_bytes().into_text().unwrap(), 1, 1)
-        } else {
-            game_state.player.get_sprite_content()
-        };
+        game_state.player.get_sprite_content();
+    let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
+    let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
+    drawable_elements.push((
+        player_y_on_screen + player_sprite_height,
+        1,
+        player_sprite_content,
+        player_x_on_screen,
+        player_y_on_screen,
+        player_sprite_width,
+        player_sprite_height,
+    ));
 
-    let darkened_player_sprite =
-        game_state.darken_text(player_sprite_content, game_state.deltarune.level);
-    let player_paragraph = Paragraph::new(darkened_player_sprite);
-
-    let player_rect =
-        ratatui::layout::Rect::new(0, 0, player_sprite_width, player_sprite_height);
-    let mut player_buffer = Buffer::empty(player_rect);
-    player_paragraph.render(player_rect, &mut player_buffer);
-
-    for y in 0..player_sprite_height {
-        for x in 0..player_sprite_width {
-            let cell = &player_buffer[(x, y)];
-            let is_space = cell.symbol() == " ";
-            let has_bg = cell.bg != Color::Reset;
-
-            if !is_space || has_bg {
-                let screen_x = player_x_on_screen.saturating_add(x);
-                let screen_y = player_y_on_screen.saturating_add(y);
-                if screen_x < size.width && screen_y < size.height {
-                    let frame_cell = &mut frame.buffer_mut()[(screen_x, screen_y)];
-                    frame_cell.set_symbol(cell.symbol());
-                    frame_cell.set_fg(cell.fg);
-                    frame_cell.modifier = cell.modifier;
-                    if has_bg {
-                        frame_cell.set_bg(cell.bg);
-                    }
-                }
-            }
+    if game_state.is_placing_sprite {
+        if let Some(pending_sprite) = &game_state.pending_placed_sprite {
+            let sprite_x_on_screen = pending_sprite.x as u16 - game_state.camera_x;
+            let sprite_y_on_screen = pending_sprite.y as u16 - game_state.camera_y;
+            drawable_elements.push((
+                sprite_y_on_screen + pending_sprite.height as u16,
+                0,
+                pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
+                sprite_x_on_screen,
+                sprite_y_on_screen,
+                pending_sprite.width as u16,
+                pending_sprite.height as u16,
+            ));
         }
+    }
+
+    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+        for placed_sprite in &current_map.placed_sprites {
+            let sprite_x_on_screen = placed_sprite.x as u16 - game_state.camera_x;
+            let sprite_y_on_screen = placed_sprite.y as u16 - game_state.camera_y;
+            drawable_elements.push((
+                sprite_y_on_screen + placed_sprite.height as u16,
+                0,
+                placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
+                sprite_x_on_screen,
+                sprite_y_on_screen,
+                placed_sprite.width as u16,
+                placed_sprite.height as u16,
+            ));
+        }
+    }
+
+    drawable_elements.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+
+    for (_, _, text, x, y, width, height) in drawable_elements {
+        draw_sprite(frame, game_state, text, x, y, width, height);
     }
 
     if game_state.debug_mode {
@@ -273,7 +287,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .loaded_maps
             .get(&current_map_key)
             .map(|m| format!("{:?}", m.kind))
-            .unwrap_or_else(|| "Unknown".to_string());
+            .unwrap_or_else(|| "Unknown or deltarune".to_string());
 
         let input_paragraph = Paragraph::new(format!("Current: {}", current_map_kind))
             .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
@@ -339,5 +353,45 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let y = (size.height.saturating_sub(text_height)) / 2;
         let area = ratatui::layout::Rect::new(x, y, text_width, text_height);
         frame.render_widget(paragraph, area);
+    }
+}
+
+fn draw_sprite(
+    frame: &mut Frame,
+    game_state: &mut GameState,
+    sprite_content: Text<'static>,
+    sprite_x: u16,
+    sprite_y: u16,
+    sprite_width: u16,
+    sprite_height: u16,
+) {
+    let size = frame.area();
+    let darkened_sprite = game_state.darken_text(sprite_content, game_state.deltarune.level);
+    let paragraph = Paragraph::new(darkened_sprite);
+
+    let rect = ratatui::layout::Rect::new(0, 0, sprite_width, sprite_height);
+    let mut buffer = Buffer::empty(rect);
+    paragraph.render(rect, &mut buffer);
+
+    for y in 0..sprite_height {
+        for x in 0..sprite_width {
+            let cell = &buffer[(x, y)];
+            let is_space = cell.symbol() == " ";
+            let has_bg = cell.bg != Color::Reset;
+
+            if !is_space || has_bg {
+                let screen_x = sprite_x.saturating_add(x);
+                let screen_y = sprite_y.saturating_add(y);
+                if screen_x < size.width && screen_y < size.height {
+                    let frame_cell = &mut frame.buffer_mut()[(screen_x, screen_y)];
+                    frame_cell.set_symbol(cell.symbol());
+                    frame_cell.set_fg(cell.fg);
+                    frame_cell.modifier = cell.modifier;
+                    if has_bg {
+                        frame_cell.set_bg(cell.bg);
+                    }
+                }
+            }
+        }
     }
 }

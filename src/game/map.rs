@@ -2,6 +2,27 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlacedSprite {
+    pub id: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub ansi_content: String,
+}
+
+impl PlacedSprite {
+    pub fn to_rect(&self) -> ratatui::layout::Rect {
+        ratatui::layout::Rect::new(
+            self.x as u16,
+            self.y as u16,
+            self.width as u16,
+            self.height as u16,
+        )
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum MapKind {
     #[serde(rename = "walls")]
@@ -43,6 +64,8 @@ pub struct MapData {
     pub walls: Vec<(u32, u32)>,
     #[serde(default)]
     pub select_object_boxes: Vec<SelectObjectBox>,
+    #[serde(default)]
+    pub placed_sprites: Vec<PlacedSprite>,
     #[serde(default)]
     pub kind: MapKind,
 }
@@ -89,6 +112,7 @@ pub struct Map {
     pub walls: Vec<(u32, u32)>,
     pub player_spawn: (u32, u32),
     pub select_object_boxes: Vec<SelectObjectBox>,
+    pub placed_sprites: Vec<PlacedSprite>,
     pub kind: MapKind,
     pub width: u16,
     pub height: u16,
@@ -134,7 +158,8 @@ impl Map {
             walls: map_data.walls,
             player_spawn: map_data.player_spawn,
             select_object_boxes: map_data.select_object_boxes,
-            kind: map_data.kind, // Add this line
+            placed_sprites: map_data.placed_sprites,
+            kind: map_data.kind,
 
             width,
             height,
@@ -159,6 +184,7 @@ impl Map {
             player_spawn: self.player_spawn,
             walls: self.walls.clone(),
             select_object_boxes: self.select_object_boxes.clone(),
+            placed_sprites: self.placed_sprites.clone(),
             kind: self.kind.clone(),
         };
 
@@ -169,6 +195,10 @@ impl Map {
 
     pub fn add_select_object_box(&mut self, select_object_box: SelectObjectBox) {
         self.select_object_boxes.push(select_object_box);
+    }
+
+    pub fn add_placed_sprite(&mut self, placed_sprite: PlacedSprite) {
+        self.placed_sprites.push(placed_sprite);
     }
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -183,6 +213,7 @@ impl Map {
             player_spawn: (10, 10),
             walls: vec![],
             select_object_boxes: vec![],
+            placed_sprites: vec![],
             kind: MapKind::Empty,
         };
 
@@ -197,6 +228,7 @@ impl Map {
             walls: vec![],
             player_spawn: (10, 10),
             select_object_boxes: vec![],
+            placed_sprites: vec![],
             kind: MapKind::Empty,
             width: 0,
             height: 0,

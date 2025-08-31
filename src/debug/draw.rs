@@ -2,10 +2,10 @@ use crate::game::config::ANIMATION_FRAME_DURATION;
 use crate::game::state::{GameState, TeleportCreationState};
 
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
 };
 
 // kind of complicated hehe  ദ്ദി/ᐠ｡‸｡ᐟ\
@@ -13,7 +13,7 @@ const TOP_INTERACTION_BOX_HEIGHT: u16 = 10;
 const BOTTOM_INTERACTION_BOX_HEIGHT: u16 = 3;
 const LEFT_INTERACTION_BOX_WIDTH: u16 = 7;
 const RIGHT_INTERACTION_BOX_WIDTH: u16 = 7;
-const COLLISION_BOX_WIDTH: u16 = 15;
+const COLLISION_BOX_WIDTH: u16 = 18;
 const COLLISION_BOX_HEIGHT: u16 = 5;
 
 pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
@@ -218,7 +218,10 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         .unwrap_or((0, 0, "N/A".to_string()));
 
     let mut debug_text = vec![
-        format!("Player: ({:.2}, {:.2})", game_state.player.x, game_state.player.y),
+        format!(
+            "Player: ({:.2}, {:.2})",
+            game_state.player.x, game_state.player.y
+        ),
         format!("Direction: {:?}", game_state.player.direction),
         format!("Animation Frame: {}", game_state.player.animation_frame),
         format!("Is Walking: {}", game_state.player.is_walking),
@@ -268,4 +271,3 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     frame.render_widget(Clear, debug_panel_rect);
     frame.render_widget(debug_paragraph, debug_panel_rect);
 }
-

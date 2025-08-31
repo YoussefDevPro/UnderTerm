@@ -1,14 +1,9 @@
 use crate::debug;
-use std::{
-    collections::HashMap,
-    io,
-    sync::mpsc,
-    time::Instant,
-};
+use std::{collections::HashMap, fs, io, sync::mpsc, time::Instant};
+
 
 use crossterm::event::{self, Event, KeyCode};
 use serde_json;
-
 
 use crate::game::state::{GameState, TeleportCreationState};
 
@@ -30,21 +25,23 @@ pub fn process_events(
     key_states: &mut HashMap<KeyCode, bool>,
     audio: &crate::audio::Audio,
 ) -> io::Result<bool> {
-    
-
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {
             if game_state.is_text_input_active {
                 match key.code {
                     KeyCode::Char(c) => {
-                        if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+                        if game_state.teleport_creation_state
+                            == TeleportCreationState::EnteringMapName
+                        {
                             game_state.teleport_destination_map_name_buffer.push(c);
                         } else {
                             game_state.text_input_buffer.push(c);
                         }
                     }
                     KeyCode::Backspace => {
-                        if game_state.teleport_creation_state == TeleportCreationState::EnteringMapName {
+                        if game_state.teleport_creation_state
+                            == TeleportCreationState::EnteringMapName
+                        {
                             game_state.teleport_destination_map_name_buffer.pop();
                         } else {
                             game_state.text_input_buffer.pop();
@@ -118,7 +115,8 @@ pub fn process_events(
                                                                 },
                                                             );
 
-                                                            if let Err(e) = map_to_modify.save_data()
+                                                            if let Err(e) =
+                                                                map_to_modify.save_data()
                                                             {
                                                                 game_state.message = format!(
                                                                     "Failed to save map data: {}",
@@ -155,7 +153,9 @@ pub fn process_events(
                                         game_state.is_drawing_select_box = false;
                                         game_state.block_player_movement_on_message = true;
                                     } else {
-                                        game_state.message = "Invalid map coordinates in name. Format: map_row_col".to_string();
+                                        game_state.message =
+                                            "Invalid map coordinates in name. Format: map_row_col"
+                                                .to_string();
                                     }
                                 } else {
                                     game_state.message =
@@ -195,7 +195,9 @@ pub fn process_events(
                             game_state.block_player_movement_on_message = true;
                         } else {
                             game_state.is_event_input_active = true;
-                            game_state.message = "Enter events. Format: 'teleport map_0_0'. Esc to finish.".to_string();
+                            game_state.message =
+                                "Enter events. Format: 'teleport map_0_0'. Esc to finish."
+                                    .to_string();
                         }
                         game_state.show_message = true;
                         game_state.message_animation_start_time = Instant::now();
@@ -239,8 +241,10 @@ pub fn process_events(
                                                 );
                                             }
                                             Err(_) => {
-                                                game_state.message =
-                                                    format!("Could not load map {}", target_map_name);
+                                                game_state.message = format!(
+                                                    "Could not load map {}",
+                                                    target_map_name
+                                                );
                                             }
                                         }
                                     } else {
@@ -326,21 +330,29 @@ pub fn process_events(
                         }
                     } else if debug::input::handle_debug_input(key, game_state) {
                     } else if key.code == KeyCode::Enter {
-                        // Handle interaction with SelectObjectBox when Enter is pressed
                         if !game_state.show_message {
                             if let Some(box_id) = game_state.current_interaction_box_id {
-                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                                    if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                let current_map_key =
+                                    (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(current_map) =
+                                    game_state.loaded_maps.get(&current_map_key)
+                                {
+                                    if let Some(interacting_box) = current_map
+                                        .select_object_boxes
+                                        .iter()
+                                        .find(|b| b.id == box_id)
+                                    {
                                         if !interacting_box.messages.is_empty() {
-                                            game_state.message = interacting_box.messages[0].clone();
+                                            game_state.message =
+                                                interacting_box.messages[0].clone();
                                             game_state.show_message = true;
-                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.message_animation_start_time =
+                                                Instant::now();
                                             game_state.animated_message_content.clear();
                                             game_state.message_animation_finished = false;
-                                            game_state.current_message_index = 1; // Set to 1 because the first message is now displayed
+                                            game_state.current_message_index = 1;
                                             game_state.block_player_movement_on_message = true;
-                                            return Ok(false); // Event handled
+                                            return Ok(false);
                                         }
                                     }
                                 }

@@ -23,4 +23,12 @@ impl Audio {
             .play_raw(decoder.convert_samples())
             .unwrap();
     }
+
+    pub fn play_text_sound(&self) {
+        let file = File::open("assets/sound/TEXT.mp3").unwrap();
+        let decoder = Decoder::new(BufReader::new(file)).unwrap();
+        self.stream_handle
+            .play_raw(decoder.convert_samples())
+            .unwrap();
+    }
 }

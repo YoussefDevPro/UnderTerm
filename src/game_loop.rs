@@ -55,6 +55,7 @@ pub fn run(
                     current_frame_size.height,
                 ),
                 delta_time,
+                &audio,
             );
 
             terminal.draw(|frame| {
