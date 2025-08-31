@@ -582,6 +582,12 @@ impl GameState {
                     ));
                 }
             }
+            self.debug_info.push("--- Key States ---".to_string());
+            for (key, pressed) in key_states {
+                if *pressed {
+                    self.debug_info.push(format!("{:?}: pressed", key));
+                }
+            }
         }
     }
 

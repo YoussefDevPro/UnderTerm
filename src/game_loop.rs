@@ -29,12 +29,12 @@ pub fn run(
     let mut last_frame_time = Instant::now();
     let audio = Audio::new().unwrap();
 
+    let mut key_states: HashMap<crossterm::event::KeyCode, bool> = HashMap::new();
+
     loop {
         let elapsed_time = last_frame_time.elapsed();
         if elapsed_time >= Duration::from_millis(1000 / FRAME_RATE) {
             last_frame_time = Instant::now();
-
-            let mut key_states: HashMap<crossterm::event::KeyCode, bool> = HashMap::new();
 
             if input::process_events(&rx, game_state, &mut key_states, &audio)? {
                 return Ok(());

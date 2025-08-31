@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     io,
     sync::mpsc,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use crossterm::event::{self, Event, KeyCode};
@@ -14,11 +14,10 @@ use crate::game::state::{GameState, TeleportCreationState};
 
 pub fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
     loop {
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if tx.send(Event::Key(key)).is_err() {
-                    break;
-                }
+        let event = event::read()?;
+        if let Event::Key(_) = event {
+            if tx.send(event).is_err() {
+                break;
             }
         }
     }

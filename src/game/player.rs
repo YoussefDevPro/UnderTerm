@@ -28,6 +28,10 @@ pub enum PlayerDirection {
     Back,
     Left,
     Right,
+    FrontLeft,
+    FrontRight,
+    BackLeft,
+    BackRight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,7 +123,7 @@ impl Player {
                     ("idle", "frisk_idle_back.ans")
                 }
             }
-            PlayerDirection::Left => {
+            PlayerDirection::Left | PlayerDirection::FrontLeft | PlayerDirection::BackLeft => {
                 if self.is_walking {
                     match self.animation_frame {
                         0 => ("idle", "frisk_idle_left.ans"),
@@ -130,7 +134,7 @@ impl Player {
                     ("idle", "frisk_idle_left.ans")
                 }
             }
-            PlayerDirection::Right => {
+            PlayerDirection::Right | PlayerDirection::FrontRight | PlayerDirection::BackRight => {
                 if self.is_walking {
                     match self.animation_frame {
                         0 => ("idle", "frisk_idle_right.ans"),
@@ -152,7 +156,12 @@ impl Player {
                     PlayerDirection::Front | PlayerDirection::Back => {
                         self.animation_frame = (self.animation_frame + 1) % 4;
                     }
-                    PlayerDirection::Left | PlayerDirection::Right => {
+                    PlayerDirection::Left
+                    | PlayerDirection::Right
+                    | PlayerDirection::FrontLeft
+                    | PlayerDirection::FrontRight
+                    | PlayerDirection::BackLeft
+                    | PlayerDirection::BackRight => {
                         self.animation_frame = (self.animation_frame + 1) % 2;
                     }
                 }
@@ -200,13 +209,13 @@ impl Player {
                     .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
                 self.y.saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
             ),
-            PlayerDirection::Left => (
+            PlayerDirection::Left | PlayerDirection::FrontLeft | PlayerDirection::BackLeft => (
                 self.x.saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
                 self.y
                     .saturating_add(player_sprite_height / 2)
                     .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
             ),
-            PlayerDirection::Right => (
+            PlayerDirection::Right | PlayerDirection::FrontRight | PlayerDirection::BackRight => (
                 self.x.saturating_add(player_sprite_width),
                 self.y
                     .saturating_add(player_sprite_height / 2)
@@ -248,24 +257,34 @@ impl Player {
             PLAYER_HORIZONTAL_SPEED
         };
 
-        if up && !down {
-            new_player_y = new_player_y.saturating_sub(move_speed);
+        if up && !down && left && !right {
+            self.direction = PlayerDirection::BackLeft;
+        } else if up && !down && right && !left {
+            self.direction = PlayerDirection::BackRight;
+        } else if down && !up && left && !right {
+            self.direction = PlayerDirection::FrontLeft;
+        } else if down && !up && right && !left {
+            self.direction = PlayerDirection::FrontRight;
+        } else if up && !down {
             self.direction = PlayerDirection::Back;
         } else if down && !up {
-            new_player_y = new_player_y.saturating_add(move_speed);
             self.direction = PlayerDirection::Front;
+        } else if left && !right {
+            self.direction = PlayerDirection::Left;
+        } else if right && !left {
+            self.direction = PlayerDirection::Right;
+        }
+
+        if up && !down {
+            new_player_y = new_player_y.saturating_sub(move_speed);
+        } else if down && !up {
+            new_player_y = new_player_y.saturating_add(move_speed);
         }
 
         if left && !right {
             new_player_x = new_player_x.saturating_sub(horizontal_move_speed);
-            if !up && !down {
-                self.direction = PlayerDirection::Left;
-            }
         } else if right && !left {
             new_player_x = new_player_x.saturating_add(horizontal_move_speed);
-            if !up && !down {
-                self.direction = PlayerDirection::Right;
-            }
         }
 
         if *key_states.get(&KeyCode::Char('w')).unwrap_or(&false) {
