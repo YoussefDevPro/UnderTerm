@@ -325,8 +325,26 @@ impl GameState {
         let player_center_x = self.player.x + (player_sprite_width as f32) / 2.0;
         let player_center_y = self.player.y + (player_sprite_height as f32) / 2.0;
 
-        let mut new_camera_x = player_center_x - (frame_size.width as f32) / 2.0;
-        let mut new_camera_y = player_center_y - (frame_size.height as f32) / 2.0;
+        const DEAD_ZONE_X: f32 = 5.0;
+        const DEAD_ZONE_Y: f32 = 0.5;
+
+        let screen_center_x = self.camera_x as f32 + (frame_size.width as f32) / 2.0;
+        let screen_center_y = self.camera_y as f32 + (frame_size.height as f32) / 2.0;
+
+        let mut new_camera_x = self.camera_x as f32;
+        let mut new_camera_y = self.camera_y as f32;
+
+        if player_center_x > screen_center_x + DEAD_ZONE_X {
+            new_camera_x = player_center_x - DEAD_ZONE_X - (frame_size.width as f32) / 2.0;
+        } else if player_center_x < screen_center_x - DEAD_ZONE_X {
+            new_camera_x = player_center_x + DEAD_ZONE_X - (frame_size.width as f32) / 2.0;
+        }
+
+        if player_center_y > screen_center_y + DEAD_ZONE_Y {
+            new_camera_y = player_center_y - DEAD_ZONE_Y - (frame_size.height as f32) / 2.0;
+        } else if player_center_y < screen_center_y - DEAD_ZONE_Y {
+            new_camera_y = player_center_y + DEAD_ZONE_Y - (frame_size.height as f32) / 2.0;
+        }
 
         let current_map_key = (self.current_map_row, self.current_map_col);
         if let Some(current_map) = self.loaded_maps.get(&current_map_key) {
@@ -339,8 +357,8 @@ impl GameState {
         new_camera_x = new_camera_x.max(0.0);
         new_camera_y = new_camera_y.max(0.0);
 
-        self.camera_x = new_camera_x as u16;
-        self.camera_y = new_camera_y as u16;
+        self.camera_x = new_camera_x.round() as u16;
+        self.camera_y = new_camera_y.round() as u16;
 
         let mut map_to_insert_after_loop: Option<((i32, i32), Map)> = None;
 

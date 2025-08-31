@@ -230,17 +230,40 @@ impl Player {
         )
     }
 
+    fn check_collision(&self, player_x: f32, player_y: f32, context: &PlayerUpdateContext) -> bool {
+        let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
+        let collision_box_x = (player_x as u16)
+            .saturating_add(player_sprite_width / 2)
+            .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
+        let collision_box_y = (player_y as u16)
+            .saturating_add(player_sprite_height)
+            .saturating_sub(PLAYER_COLLISION_HEIGHT);
+
+        for y_offset in 0..PLAYER_COLLISION_HEIGHT {
+            let check_y = collision_box_y.saturating_add(y_offset);
+            for x_offset in 0..PLAYER_COLLISION_WIDTH {
+                let check_x = collision_box_x.saturating_add(x_offset);
+
+                let collision_map_key = (*context.current_map_row, *context.current_map_col);
+                if let Some(collision_map) = context.loaded_maps.get(&collision_map_key) {
+                    if collision_map
+                        .walls
+                        .contains(&(check_x as u32, check_y as u32))
+                    {
+                        return true; // collision
+                    }
+                }
+            }
+        }
+        false // no collision
+    }
+
     pub fn update(
         &mut self,
         context: &mut PlayerUpdateContext,
         key_states: &HashMap<KeyCode, bool>,
         delta_time: Duration,
     ) {
-        let current_map_key = (*context.current_map_row, *context.current_map_col);
-        let current_map = context.loaded_maps.get(&current_map_key).cloned().unwrap();
-
-        let mut new_player_x = self.x;
-        let mut new_player_y = self.y;
         let original_player_x = self.x;
         let original_player_y = self.y;
 
@@ -266,6 +289,9 @@ impl Player {
         } else if right && !left {
             self.direction = PlayerDirection::Right;
         }
+
+        let mut new_player_x = self.x;
+        let mut new_player_y = self.y;
 
         if context.debug_mode {
             self.movement_counter = self.movement_counter.wrapping_add(1);
@@ -328,48 +354,30 @@ impl Player {
             }
         }
 
-        let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
-
-        let collision_box_x = (new_player_x as u16)
-            .saturating_add(player_sprite_width / 2)
-            .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
-        let collision_box_y = (new_player_y as u16)
-            .saturating_add(player_sprite_height)
-            .saturating_sub(PLAYER_COLLISION_HEIGHT);
-
         if !context.debug_mode {
-            let mut collision = false;
-            for y_offset in 0..PLAYER_COLLISION_HEIGHT {
-                let check_y = collision_box_y.saturating_add(y_offset);
-                for x_offset in 0..PLAYER_COLLISION_WIDTH {
-                    let check_x = collision_box_x.saturating_add(x_offset);
-
-                    let collision_map_key = (*context.current_map_row, *context.current_map_col);
-                    if let Some(collision_map) = context.loaded_maps.get(&collision_map_key) {
-                        if collision_map
-                            .walls
-                            .contains(&(check_x as u32, check_y as u32))
-                        {
-                            collision = true;
-                            break;
-                        }
-                    }
-                }
-                if collision {
-                    break;
-                }
-            }
-
-            if collision {
+            if self.check_collision(new_player_x, new_player_y, context) {
                 self.x = original_player_x;
                 self.y = original_player_y;
             } else {
-                self.x = new_player_x.min((current_map.width.saturating_sub(player_sprite_width)) as f32);
-                self.y = new_player_y.min((current_map.height.saturating_sub(player_sprite_height)) as f32);
+                self.x = new_player_x;
+                self.y = new_player_y;
             }
         } else {
             self.x = new_player_x;
             self.y = new_player_y;
+        }
+
+        let current_map_key = (*context.current_map_row, *context.current_map_col);
+        if let Some(current_map) = context.loaded_maps.get(&current_map_key) {
+            let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
+            self.x = self
+                .x
+                .max(0.0)
+                .min((current_map.width.saturating_sub(player_sprite_width)) as f32);
+            self.y = self
+                .y
+                .max(0.0)
+                .min((current_map.height.saturating_sub(player_sprite_height)) as f32);
         }
 
         if self.x != original_player_x || self.y != original_player_y {
