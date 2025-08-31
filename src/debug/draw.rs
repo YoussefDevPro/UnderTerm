@@ -165,6 +165,30 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                 frame.render_widget(select_box_paragraph, clamped_rect);
             }
         }
+
+        // Battle Zones
+        for battle_zone in &current_map.battle_zones {
+            let battle_zone_rect = battle_zone.to_rect();
+
+            let draw_x = battle_zone_rect.x.saturating_sub(game_state.camera_x);
+            let draw_y = battle_zone_rect.y.saturating_sub(game_state.camera_y);
+
+            let draw_rect = Rect::new(
+                draw_x,
+                draw_y,
+                battle_zone_rect.width,
+                battle_zone_rect.height,
+            );
+            let clamped_rect = draw_rect.intersection(size);
+            if !clamped_rect.is_empty() {
+                let battle_zone_paragraph = Paragraph::new("B").block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Magenta)),
+                );
+                frame.render_widget(battle_zone_paragraph, clamped_rect);
+            }
+        }
     }
 
     // draw box

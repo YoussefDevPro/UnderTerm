@@ -330,24 +330,45 @@ pub fn process_events(
                         }
                     } else if debug::input::handle_debug_input(key, game_state) {
                     } else if key.code == KeyCode::Enter {
-                        if !game_state.show_message {
+                        if game_state.is_drawing_battle_zone {
+                            if let Some((start_x, start_y)) = game_state.battle_zone_start_coords {
+                                let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                                    let new_id = map_to_modify.battle_zones.iter().map(|b| b.id).max().unwrap_or(0) + 1;
+                                    let new_battle_zone = crate::game::map::BattleZone {
+                                        id: new_id,
+                                        x: start_x.min(end_x) as u32,
+                                        y: start_y.min(end_y) as u32,
+                                        width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
+                                        height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
+                                    };
+                                    map_to_modify.add_battle_zone(new_battle_zone);
+                                    if let Err(e) = map_to_modify.save_data() {
+                                        game_state.message = format!("Failed to save map data: {}", e);
+                                    } else {
+                                        game_state.message = "Battle zone created and saved.".to_string();
+                                    }
+                                } else {
+                                    game_state.message = "Error: Current map not found for saving battle zone.".to_string();
+                                }
+                            }
+                            game_state.is_drawing_battle_zone = false;
+                            game_state.battle_zone_start_coords = None;
+                            game_state.block_player_movement_on_message = true;
+                            game_state.show_message = true;
+                            game_state.message_animation_start_time = Instant::now();
+                            game_state.animated_message_content.clear();
+                            return Ok(false); // Return early after handling battle zone creation
+                        } else if !game_state.show_message {
                             if let Some(box_id) = game_state.current_interaction_box_id {
-                                let current_map_key =
-                                    (game_state.current_map_row, game_state.current_map_col);
-                                if let Some(current_map) =
-                                    game_state.loaded_maps.get(&current_map_key)
-                                {
-                                    if let Some(interacting_box) = current_map
-                                        .select_object_boxes
-                                        .iter()
-                                        .find(|b| b.id == box_id)
-                                    {
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                    if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
                                         if !interacting_box.messages.is_empty() {
-                                            game_state.message =
-                                                interacting_box.messages[0].clone();
+                                            game_state.message = interacting_box.messages[0].clone();
                                             game_state.show_message = true;
-                                            game_state.message_animation_start_time =
-                                                Instant::now();
+                                            game_state.message_animation_start_time = Instant::now();
                                             game_state.animated_message_content.clear();
                                             game_state.message_animation_finished = false;
                                             game_state.current_message_index = 1;
@@ -362,25 +383,13 @@ pub fn process_events(
                         if game_state.show_message {
                             if game_state.message_animation_finished {
                                 if let Some(box_id) = game_state.current_interaction_box_id {
-                                    let current_map_key =
-                                        (game_state.current_map_row, game_state.current_map_col);
-                                    if let Some(current_map) =
-                                        game_state.loaded_maps.get(&current_map_key)
-                                    {
-                                        if let Some(interacting_box) = current_map
-                                            .select_object_boxes
-                                            .iter()
-                                            .find(|b| b.id == box_id)
-                                        {
-                                            if game_state.current_message_index
-                                                < interacting_box.messages.len()
-                                            {
-                                                game_state.message = interacting_box.messages
-                                                    [game_state.current_message_index]
-                                                    .clone();
+                                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                        if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                            if game_state.current_message_index < interacting_box.messages.len() {
+                                                game_state.message = interacting_box.messages[game_state.current_message_index].clone();
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time =
-                                                    Instant::now();
+                                                game_state.message_animation_start_time = Instant::now();
                                                 game_state.animated_message_content.clear();
                                                 game_state.message_animation_finished = false;
                                                 game_state.current_message_index += 1;
@@ -390,11 +399,8 @@ pub fn process_events(
                                                 game_state.dismiss_message();
                                                 game_state.current_interaction_box_id = None;
                                                 game_state.current_message_index = 0;
-                                                let _events_to_process: Vec<
-                                                    crate::game::map::Event,
-                                                > = events;
-                                                game_state.recently_teleported_from_box_id =
-                                                    Some(box_id);
+                                                let _events_to_process: Vec<crate::game::map::Event> = events;
+                                                game_state.recently_teleported_from_box_id = Some(box_id);
                                             }
                                         }
                                     }
@@ -430,6 +436,99 @@ pub fn process_events(
                         game_state.show_message = true;
                         game_state.message_animation_start_time = Instant::now();
                         game_state.animated_message_content.clear();
+                    } else if key.code == KeyCode::Char('b') {
+                        if !game_state.is_drawing_battle_zone {
+                            game_state.is_drawing_battle_zone = true;
+                            game_state.battle_zone_start_coords = Some((game_state.player.x as u16, game_state.player.y as u16));
+                            game_state.message = "Drawing battle zone: Move player to set end point, then press Enter.".to_string();
+                            game_state.block_player_movement_on_message = false;
+                        } else {
+                            game_state.message = "Finish drawing battle zone by pressing Enter.".to_string();
+                        }
+                        game_state.show_message = true;
+                        game_state.message_animation_start_time = Instant::now();
+                        game_state.animated_message_content.clear();
+                    } else if key.code == KeyCode::Enter {
+                        if game_state.is_drawing_battle_zone {
+                            if let Some((start_x, start_y)) = game_state.battle_zone_start_coords {
+                                let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {
+                                    let new_id = map_to_modify.battle_zones.iter().map(|b| b.id).max().unwrap_or(0) + 1;
+                                    let new_battle_zone = crate::game::map::BattleZone {
+                                        id: new_id,
+                                        x: start_x.min(end_x) as u32,
+                                        y: start_y.min(end_y) as u32,
+                                        width: start_x.max(end_x).saturating_sub(start_x.min(end_x)).saturating_add(1) as u32,
+                                        height: start_y.max(end_y).saturating_sub(start_y.min(end_y)).saturating_add(1) as u32,
+                                    };
+                                    map_to_modify.add_battle_zone(new_battle_zone);
+                                    if let Err(e) = map_to_modify.save_data() {
+                                        game_state.message = format!("Failed to save map data: {}", e);
+                                    } else {
+                                        game_state.message = "Battle zone created and saved.".to_string();
+                                    }
+                                } else {
+                                    game_state.message = "Error: Current map not found for saving battle zone.".to_string();
+                                }
+                            }
+                            game_state.is_drawing_battle_zone = false;
+                            game_state.battle_zone_start_coords = None;
+                            game_state.block_player_movement_on_message = true;
+                            game_state.show_message = true;
+                            game_state.message_animation_start_time = Instant::now();
+                            game_state.animated_message_content.clear();
+                        } else if !game_state.show_message {
+                            if let Some(box_id) = game_state.current_interaction_box_id {
+                                let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                    if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                        if !interacting_box.messages.is_empty() {
+                                            game_state.message = interacting_box.messages[0].clone();
+                                            game_state.show_message = true;
+                                            game_state.message_animation_start_time = Instant::now();
+                                            game_state.animated_message_content.clear();
+                                            game_state.message_animation_finished = false;
+                                            game_state.current_message_index = 1;
+                                            game_state.block_player_movement_on_message = true;
+                                            return Ok(false);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if game_state.show_message {
+                            if game_state.message_animation_finished {
+                                if let Some(box_id) = game_state.current_interaction_box_id {
+                                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
+                                    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
+                                        if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                            if game_state.current_message_index < interacting_box.messages.len() {
+                                                game_state.message = interacting_box.messages[game_state.current_message_index].clone();
+                                                game_state.show_message = true;
+                                                game_state.message_animation_start_time = Instant::now();
+                                                game_state.animated_message_content.clear();
+                                                game_state.message_animation_finished = false;
+                                                game_state.current_message_index += 1;
+                                            } else {
+                                                let events = interacting_box.events.clone();
+                                                let box_id = interacting_box.id;
+                                                game_state.dismiss_message();
+                                                game_state.current_interaction_box_id = None;
+                                                game_state.current_message_index = 0;
+                                                let _events_to_process: Vec<crate::game::map::Event> = events;
+                                                game_state.recently_teleported_from_box_id = Some(box_id);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    game_state.dismiss_message();
+                                }
+                            } else {
+                                game_state.skip_message_animation();
+                            }
+                        }
                     }
                 }
                 event::KeyEventKind::Release => {
@@ -441,6 +540,9 @@ pub fn process_events(
                         game_state.esc_press_start_time = None;
                     }
                     if key.code == KeyCode::Char('o') && game_state.debug_mode {
+                        game_state.show_collision_box = false;
+                    }
+                    if key.code == KeyCode::Char('b') && game_state.debug_mode {
                         game_state.show_collision_box = false;
                     }
                 }

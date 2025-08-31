@@ -1,8 +1,11 @@
 use super::deltarune::Deltarune;
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
+use crate::game::map::PlacedSprite;
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
+use rand::thread_rng;
+use rand::Rng;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span, Text};
@@ -10,9 +13,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
 use std::time::{Duration, Instant};
-use crate::game::map::PlacedSprite;
-use rand::Rng;
-use rand::thread_rng;
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -70,6 +70,18 @@ pub struct GameState {
     pub is_map_kind_selection_active: bool,
     pub is_placing_sprite: bool,
     pub pending_placed_sprite: Option<crate::game::map::PlacedSprite>,
+    pub is_drawing_battle_zone: bool,
+    pub battle_zone_start_coords: Option<(u16, u16)>,
+    pub pending_battle_zone: Option<crate::game::map::BattleZone>,
+    pub is_battle_active: bool,
+    pub active_battle_zone_id: Option<u32>,
+    pub is_flickering: bool,
+    #[serde(skip, default = "default_instant")]
+    pub flicker_timer: Instant,
+    pub flicker_duration: Duration,
+    pub flicker_count: u8,
+    pub show_flicker_black_screen: bool,
+    pub battle_page_active: bool,
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -149,6 +161,17 @@ impl GameState {
             is_map_kind_selection_active: false,
             is_placing_sprite: false,
             pending_placed_sprite: None,
+            is_drawing_battle_zone: false,
+            battle_zone_start_coords: None,
+            pending_battle_zone: None,
+            is_battle_active: false,
+            active_battle_zone_id: None,
+            is_flickering: false,
+            flicker_timer: Instant::now(),
+            flicker_duration: Duration::from_millis(75),
+            flicker_count: 10,
+            show_flicker_black_screen: false,
+            battle_page_active: false,
             sound_error: None,
             current_map_row,
             current_map_col,
@@ -224,6 +247,28 @@ impl GameState {
         delta_time: std::time::Duration,
         audio: &crate::audio::Audio,
     ) {
+        // Handle flicker effect
+        if self.is_flickering {
+            if self.flicker_timer.elapsed() >= self.flicker_duration {
+                self.show_flicker_black_screen = !self.show_flicker_black_screen;
+                self.flicker_count = self.flicker_count.saturating_sub(1);
+                self.flicker_timer = Instant::now();
+
+                if self.flicker_count == 0 {
+                    self.is_flickering = false;
+                    self.battle_page_active = true; // Transition to "hey ya" page
+                    self.show_flicker_black_screen = false; // Ensure not black when transitioning
+                }
+            }
+            // Block other updates during flicker
+            return;
+        }
+
+        // If battle page is active, block other updates
+        if self.battle_page_active {
+            return;
+        }
+
         if self.show_message && self.message.is_empty() {
             self.dismiss_message();
         }
@@ -241,9 +286,11 @@ impl GameState {
                 let current_len = self.animated_message_content.chars().count();
                 if current_len < self.message.chars().count() {
                     let next_char_index = self.animated_message_content.chars().count();
-                    self.animated_message_content.push(self.message.chars().nth(next_char_index).unwrap());
+                    self.animated_message_content
+                        .push(self.message.chars().nth(next_char_index).unwrap());
                     audio.play_text_sound();
-                    self.message_animation_interval = Duration::from_millis(thread_rng().gen_range(50..=100));
+                    self.message_animation_interval =
+                        Duration::from_millis(thread_rng().gen_range(50..=100));
                     self.message_animation_start_time = Instant::now();
                 } else {
                     self.message_animation_finished = true;
@@ -476,6 +523,45 @@ impl GameState {
                     }
                     if teleport_destination.is_some() {
                         break;
+                    }
+                }
+            }
+
+            // Battle Zone Collision Detection
+            for battle_zone in &current_map.battle_zones {
+                if battle_zone.to_rect().intersects(player_collision_rect) {
+                    if !self.is_battle_active || self.active_battle_zone_id != Some(battle_zone.id)
+                    {
+                        self.is_battle_active = true;
+                        self.active_battle_zone_id = Some(battle_zone.id);
+                        self.message = format!("Entered Battle Zone {}", battle_zone.id);
+                        self.show_message = true;
+                        self.message_animation_start_time = Instant::now();
+                        self.animated_message_content.clear();
+                        // Trigger flicker
+                        self.is_flickering = true;
+                        self.flicker_timer = Instant::now();
+                        self.flicker_count = 10; // Reset flicker count
+                        self.show_flicker_black_screen = false; // Start with game screen
+                        audio.play_enemy_encounter_sound();
+                    }
+                }
+            }
+
+            // Deactivate battle zone if player leaves
+            if self.is_battle_active {
+                if let Some(active_id) = self.active_battle_zone_id {
+                    if let Some(active_zone) =
+                        current_map.battle_zones.iter().find(|z| z.id == active_id)
+                    {
+                        if !active_zone.to_rect().intersects(player_collision_rect) {
+                            self.is_battle_active = false;
+                            self.active_battle_zone_id = None;
+                            self.message = format!("Exited Battle Zone {}", active_id);
+                            self.show_message = true;
+                            self.message_animation_start_time = Instant::now();
+                            self.animated_message_content.clear();
+                        }
                     }
                 }
             }

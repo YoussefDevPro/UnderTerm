@@ -14,15 +14,49 @@ use ratatui::{
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
-    frame.render_widget(Block::default().bg(Color::Black), size);
+
+    if game_state.battle_page_active {
+        frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+        let hey_ya_text = Paragraph::new("looks like, u reached an unfinished part")
+            .style(Style::default().fg(Color::White));
+        let hey_ya_area = ratatui::layout::Rect::new(size.width / 2 - 4, size.height / 2 - 1, 8, 2);
+        frame.render_widget(hey_ya_text, hey_ya_area);
+        return;
+    }
+
+    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+
+    if game_state.is_flickering && game_state.show_flicker_black_screen {
+        frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+
+        let ascii_art = "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ";
+        let ascii_text = Text::styled(ascii_art, Style::default().fg(Color::Rgb(255, 0, 0)));
+
+        let ascii_width = 7;
+        let ascii_height = 4;
+
+        let (_, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
+
+        let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
+        let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
+
+        let art_x = (player_x_on_screen + player_sprite_width / 2).saturating_sub(ascii_width / 2);
+        let art_y =
+            (player_y_on_screen + player_sprite_height / 2).saturating_sub(ascii_height / 2);
+
+        let art_rect = ratatui::layout::Rect::new(art_x, art_y, ascii_width, ascii_height);
+
+        frame.render_widget(Paragraph::new(ascii_text), art_rect);
+        return;
+    }
 
     let combined_map_text = game_state.get_combined_map_text(size, game_state.deltarune.level);
 
     let map_paragraph = Paragraph::new(combined_map_text)
         .scroll((game_state.camera_y, game_state.camera_x))
-        .style(Style::default().bg(Color::Black));
+        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
 
-    let map_block = Block::default().style(Style::default().bg(Color::Black));
+    let map_block = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
     frame.render_widget(map_block, size);
     frame.render_widget(map_paragraph, size);
 
@@ -124,57 +158,46 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let actual_height = (height as i32 - offset_y).max(0) as u16;
 
         let darkened_sprite = game_state.darken_text(text, game_state.deltarune.level);
-        let paragraph = Paragraph::new(darkened_sprite)
-            .scroll((offset_y as u16, offset_x as u16)); // Apply scrolling
+        let paragraph = Paragraph::new(darkened_sprite).scroll((offset_y as u16, offset_x as u16));
 
-        // Create the Rect for rendering
-        let potential_render_rect = ratatui::layout::Rect::new(draw_x, draw_y, actual_width, actual_height);
+        let potential_render_rect =
+            ratatui::layout::Rect::new(draw_x, draw_y, actual_width, actual_height);
 
-        // Clip the render_rect against the frame's area
         let final_render_rect = potential_render_rect.intersection(frame.area());
 
-        // If the final render rect is empty, skip drawing
         if final_render_rect.is_empty() {
             continue;
         }
 
-        // Create a temporary buffer to render the paragraph into
-        let mut temp_buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, final_render_rect.width, final_render_rect.height));
-        paragraph.render(ratatui::layout::Rect::new(0, 0, final_render_rect.width, final_render_rect.height), &mut temp_buffer);
+        let mut temp_buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(
+            0,
+            0,
+            final_render_rect.width,
+            final_render_rect.height,
+        ));
+        paragraph.render(
+            ratatui::layout::Rect::new(0, 0, final_render_rect.width, final_render_rect.height),
+            &mut temp_buffer,
+        );
 
-        // Iterate over the cells of the temporary buffer and draw them to the frame buffer
         for y_temp in 0..final_render_rect.height {
             for x_temp in 0..final_render_rect.width {
                 let cell = temp_buffer.get(x_temp, y_temp);
 
-                // Calculate the absolute screen coordinates
                 let screen_x = final_render_rect.x + x_temp;
                 let screen_y = final_render_rect.y + y_temp;
 
-                // Apply the condition: if cell is a space AND its background is Color::Reset, skip drawing
                 if cell.symbol() == " " && cell.bg == ratatui::style::Color::Reset {
                     continue;
                 }
 
-                // Get the cell from the main frame buffer
                 let frame_cell = frame.buffer_mut().get_mut(screen_x, screen_y);
 
-                // Copy the symbol and foreground color
                 frame_cell.set_symbol(cell.symbol());
                 frame_cell.set_fg(cell.fg);
-
-                // Handle background color:
-                // If the sprite cell's background is NOT reset, use it.
-                // If it IS reset, and the sprite cell has a symbol,
-                // then we want to preserve the underlying background.
-                // This prevents "reset" backgrounds from overwriting existing backgrounds
-                // when there's a character on top.
                 if cell.bg != ratatui::style::Color::Reset {
                     frame_cell.set_bg(cell.bg);
                 }
-                // If cell.bg IS Color::Reset, we do nothing to frame_cell.bg,
-                // effectively preserving the underlying background.
-
                 frame_cell.modifier = cell.modifier;
             }
         }

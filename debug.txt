@@ -1,13 +1,14 @@
 {
   "player": {
-    "x": 398,
-    "y": 38,
-    "direction": "Back",
+    "x": 95.41304,
+    "y": 43.97235,
+    "direction": "Left",
     "animation_frame": 0,
-    "is_walking": false
+    "is_walking": false,
+    "movement_counter": 101
   },
-  "camera_x": 225,
-  "camera_y": 17,
+  "camera_x": 0,
+  "camera_y": 22,
   "message": "",
   "show_message": false,
   "animated_message_content": "",
@@ -19,18 +20,42 @@
   "is_drawing_select_box": false,
   "select_box_start_coords": null,
   "is_confirming_select_box": false,
-  "block_player_movement_on_message": true,
+  "block_player_movement_on_message": false,
   "is_text_input_active": false,
   "text_input_buffer": "",
   "pending_select_box": null,
   "is_event_input_active": false,
   "is_map_kind_selection_active": false,
-  "current_map_name": "map_0_0",
-  "current_map_row": 0,
-  "current_map_col": 0,
+  "is_placing_sprite": false,
+  "pending_placed_sprite": null,
+  "is_drawing_battle_zone": true,
+  "battle_zone_start_coords": [
+    99,
+    43
+  ],
+  "pending_battle_zone": null,
+  "is_battle_active": false,
+  "active_battle_zone_id": null,
+  "is_flickering": false,
+  "flicker_duration": {
+    "secs": 0,
+    "nanos": 50000000
+  },
+  "flicker_count": 10,
+  "show_flicker_black_screen": false,
+  "battle_page_active": false,
+  "current_map_name": "map_1_2",
+  "current_map_row": 1,
+  "current_map_col": 2,
   "is_creating_map": false,
   "last_teleport_origin": null,
   "recently_teleported_from_box_id": null,
   "teleport_creation_state": "None",
-  "teleport_destination_map_name_buffer": ""
+  "teleport_destination_map_name_buffer": "",
+  "just_teleported": false,
+  "last_teleport_destination_box_id": null,
+  "deltarune": {
+    "level": 0
+  },
+  "teleport_state": "None"
 }

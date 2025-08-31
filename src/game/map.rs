@@ -23,6 +23,26 @@ impl PlacedSprite {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BattleZone {
+    pub id: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl BattleZone {
+    pub fn to_rect(&self) -> ratatui::layout::Rect {
+        ratatui::layout::Rect::new(
+            self.x as u16,
+            self.y as u16,
+            self.width as u16,
+            self.height as u16,
+        )
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum MapKind {
     #[serde(rename = "walls")]
@@ -68,6 +88,8 @@ pub struct MapData {
     pub placed_sprites: Vec<PlacedSprite>,
     #[serde(default)]
     pub kind: MapKind,
+    #[serde(default)]
+    pub battle_zones: Vec<BattleZone>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -114,6 +136,7 @@ pub struct Map {
     pub select_object_boxes: Vec<SelectObjectBox>,
     pub placed_sprites: Vec<PlacedSprite>,
     pub kind: MapKind,
+    pub battle_zones: Vec<BattleZone>,
     pub width: u16,
     pub height: u16,
 }
@@ -160,6 +183,7 @@ impl Map {
             select_object_boxes: map_data.select_object_boxes,
             placed_sprites: map_data.placed_sprites,
             kind: map_data.kind,
+            battle_zones: map_data.battle_zones,
 
             width,
             height,
@@ -186,6 +210,7 @@ impl Map {
             select_object_boxes: self.select_object_boxes.clone(),
             placed_sprites: self.placed_sprites.clone(),
             kind: self.kind.clone(),
+            battle_zones: self.battle_zones.clone(),
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -199,6 +224,10 @@ impl Map {
 
     pub fn add_placed_sprite(&mut self, placed_sprite: PlacedSprite) {
         self.placed_sprites.push(placed_sprite);
+    }
+
+    pub fn add_battle_zone(&mut self, battle_zone: BattleZone) {
+        self.battle_zones.push(battle_zone);
     }
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -215,6 +244,7 @@ impl Map {
             select_object_boxes: vec![],
             placed_sprites: vec![],
             kind: MapKind::Empty,
+            battle_zones: vec![],
         };
 
         let serialized = serde_json::to_string_pretty(&map_data)?;
@@ -230,6 +260,7 @@ impl Map {
             select_object_boxes: vec![],
             placed_sprites: vec![],
             kind: MapKind::Empty,
+            battle_zones: vec![],
             width: 0,
             height: 0,
         })
