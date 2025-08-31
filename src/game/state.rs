@@ -640,7 +640,11 @@ impl GameState {
                     new_style = new_style.fg(darken_color(fg, darkness_level));
                 }
                 if let Some(bg) = new_style.bg {
-                    new_style = new_style.bg(darken_color(bg, darkness_level));
+                    if bg == Color::Reset {
+                        new_style.bg = None;
+                    } else {
+                        new_style = new_style.bg(darken_color(bg, darkness_level));
+                    }
                 }
                 new_spans.push(Span::styled(span.content, new_style));
             }

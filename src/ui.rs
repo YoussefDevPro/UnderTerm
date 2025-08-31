@@ -3,9 +3,10 @@ use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
 
 use ratatui::{
+    buffer::Buffer,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame,
 };
 
@@ -65,16 +66,31 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         game_state.darken_text(player_sprite_content, game_state.deltarune.level);
     let player_paragraph = Paragraph::new(darkened_player_sprite);
 
-    let player_draw_rect = ratatui::layout::Rect::new(
-        player_x_on_screen,
-        player_y_on_screen,
-        player_sprite_width,
-        player_sprite_height,
-    );
+    let player_rect =
+        ratatui::layout::Rect::new(0, 0, player_sprite_width, player_sprite_height);
+    let mut player_buffer = Buffer::empty(player_rect);
+    player_paragraph.render(player_rect, &mut player_buffer);
 
-    let clamped_player_rect = player_draw_rect.intersection(size);
-    if !clamped_player_rect.is_empty() {
-        frame.render_widget(player_paragraph, clamped_player_rect);
+    for y in 0..player_sprite_height {
+        for x in 0..player_sprite_width {
+            let cell = &player_buffer[(x, y)];
+            let is_space = cell.symbol() == " ";
+            let has_bg = cell.bg != Color::Reset;
+
+            if !is_space || has_bg {
+                let screen_x = player_x_on_screen.saturating_add(x);
+                let screen_y = player_y_on_screen.saturating_add(y);
+                if screen_x < size.width && screen_y < size.height {
+                    let frame_cell = &mut frame.buffer_mut()[(screen_x, screen_y)];
+                    frame_cell.set_symbol(cell.symbol());
+                    frame_cell.set_fg(cell.fg);
+                    frame_cell.modifier = cell.modifier;
+                    if has_bg {
+                        frame_cell.set_bg(cell.bg);
+                    }
+                }
+            }
+        }
     }
 
     if game_state.debug_mode {
@@ -304,12 +320,9 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let dot_line_2 = "▀██▀ ".repeat(num_dots);
 
         let combined_lines = vec![
-            format!("{}
- {}", exiting_text_lines[0], dot_line_0),
-            format!("{}
- {}", exiting_text_lines[1], dot_line_1),
-            format!("{}
- {}", exiting_text_lines[2], dot_line_2),
+            format!("{}\n {}", exiting_text_lines[0], dot_line_0),
+            format!("{}\n {}", exiting_text_lines[1], dot_line_1),
+            format!("{}\n {}", exiting_text_lines[2], dot_line_2),
         ];
         let combined_text = combined_lines.join("\n");
 
