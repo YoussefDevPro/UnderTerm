@@ -39,7 +39,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             if !game_state.is_drawing_select_box {
                 game_state.is_drawing_select_box = true;
                 game_state.select_box_start_coords =
-                    Some((game_state.player.x, game_state.player.y));
+                    Some((game_state.player.x as u16, game_state.player.y as u16));
                 game_state.message =
                     "Drawing select box: Move player to set end point, then press Enter."
                         .to_string();
@@ -67,7 +67,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             if game_state.teleport_creation_state == TeleportCreationState::None {
                 game_state.teleport_creation_state = TeleportCreationState::DrawingBox;
                 game_state.select_box_start_coords =
-                    Some((game_state.player.x, game_state.player.y));
+                    Some((game_state.player.x as u16, game_state.player.y as u16));
                 game_state.message =
                     "Drawing teleport line: Move player to set end point, then press Enter."
                         .to_string();
@@ -93,7 +93,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                     game_state.is_confirming_select_box = false;
                 } else {
                     if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-                        let (end_x, end_y) = (game_state.player.x, game_state.player.y);
+                        let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
                         let current_map_key =
                             (game_state.current_map_row, game_state.current_map_col);
                         if let Some(map_to_modify) =
@@ -136,7 +136,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                 true
             } else if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
                 if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-                    let (end_x, end_y) = (game_state.player.x, game_state.player.y);
+                    let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
 
                     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
                     if let Some(map_to_modify) = game_state.loaded_maps.get_mut(&current_map_key) {

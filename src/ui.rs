@@ -16,8 +16,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
     frame.render_widget(Block::default().bg(Color::Black), size);
 
-    let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
-    let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
+    let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
+    let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
     let combined_map_text = game_state.get_combined_map_text(size, game_state.deltarune.level);
 
     let map_paragraph = Paragraph::new(combined_map_text)
@@ -99,8 +99,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     if game_state.is_drawing_select_box {
         if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-            let current_x = game_state.player.x;
-            let current_y = game_state.player.y;
+            let current_x = game_state.player.x as u16;
+            let current_y = game_state.player.y as u16;
 
             let min_x = start_x.min(current_x);
             let max_x = start_x.max(current_x);
@@ -340,6 +340,4 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let area = ratatui::layout::Rect::new(x, y, text_width, text_height);
         frame.render_widget(paragraph, area);
     }
-
-    
 }

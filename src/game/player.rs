@@ -36,8 +36,8 @@ pub enum PlayerDirection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
-    pub x: u16,
-    pub y: u16,
+    pub x: f32,
+    pub y: f32,
     pub direction: PlayerDirection,
     pub animation_frame: u8,
     pub is_walking: bool,
@@ -65,7 +65,7 @@ pub struct PlayerUpdateContext<'a> {
 }
 
 impl Player {
-    pub fn new(x: u16, y: u16) -> Self {
+    pub fn new(x: f32, y: f32) -> Self {
         Player {
             x,
             y,
@@ -176,12 +176,10 @@ impl Player {
     pub fn get_collision_rect(&self) -> ratatui::layout::Rect {
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 
-        let collision_box_x = self
-            .x
+        let collision_box_x = (self.x as u16)
             .saturating_add(player_sprite_width / 2)
             .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
-        let collision_box_y = self
-            .y
+        let collision_box_y = (self.y as u16)
             .saturating_add(player_sprite_height)
             .saturating_sub(PLAYER_COLLISION_HEIGHT);
 
@@ -197,27 +195,27 @@ impl Player {
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 
         let (select_box_x, select_box_y) = match self.direction {
-            PlayerDirection::Front => (
-                self.x
+            PlayerDirection::Front | PlayerDirection::FrontLeft | PlayerDirection::FrontRight => (
+                (self.x as u16)
                     .saturating_add(player_sprite_width / 2)
                     .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
-                self.y.saturating_add(player_sprite_height),
+                (self.y as u16).saturating_add(player_sprite_height),
             ),
-            PlayerDirection::Back => (
-                self.x
+            PlayerDirection::Back | PlayerDirection::BackLeft | PlayerDirection::BackRight => (
+                (self.x as u16)
                     .saturating_add(player_sprite_width / 2)
                     .saturating_sub(PLAYER_INTERACTION_BOX_WIDTH / 2),
-                self.y.saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
+                (self.y as u16).saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT),
             ),
-            PlayerDirection::Left | PlayerDirection::FrontLeft | PlayerDirection::BackLeft => (
-                self.x.saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
-                self.y
+            PlayerDirection::Left => (
+                (self.x as u16).saturating_sub(PLAYER_INTERACTION_BOX_WIDTH),
+                (self.y as u16)
                     .saturating_add(player_sprite_height / 2)
                     .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
             ),
-            PlayerDirection::Right | PlayerDirection::FrontRight | PlayerDirection::BackRight => (
-                self.x.saturating_add(player_sprite_width),
-                self.y
+            PlayerDirection::Right => (
+                (self.x as u16).saturating_add(player_sprite_width),
+                (self.y as u16)
                     .saturating_add(player_sprite_height / 2)
                     .saturating_sub(PLAYER_INTERACTION_BOX_HEIGHT / 2),
             ),
@@ -250,13 +248,6 @@ impl Player {
         let left = *key_states.get(&KeyCode::Left).unwrap_or(&false);
         let right = *key_states.get(&KeyCode::Right).unwrap_or(&false);
 
-        let move_speed = if context.debug_mode { 1 } else { PLAYER_SPEED };
-        let horizontal_move_speed = if context.debug_mode {
-            1
-        } else {
-            PLAYER_HORIZONTAL_SPEED
-        };
-
         if up && !down && left && !right {
             self.direction = PlayerDirection::BackLeft;
         } else if up && !down && right && !left {
@@ -275,16 +266,19 @@ impl Player {
             self.direction = PlayerDirection::Right;
         }
 
+        let move_speed = if context.debug_mode { 1.0 } else { PLAYER_SPEED };
+        let horizontal_move_speed = if context.debug_mode { 1.0 } else { PLAYER_HORIZONTAL_SPEED };
+
         if up && !down {
-            new_player_y = new_player_y.saturating_sub(move_speed);
+            new_player_y -= move_speed;
         } else if down && !up {
-            new_player_y = new_player_y.saturating_add(move_speed);
+            new_player_y += move_speed;
         }
 
         if left && !right {
-            new_player_x = new_player_x.saturating_sub(horizontal_move_speed);
+            new_player_x -= horizontal_move_speed;
         } else if right && !left {
-            new_player_x = new_player_x.saturating_add(horizontal_move_speed);
+            new_player_x += horizontal_move_speed;
         }
 
         if *key_states.get(&KeyCode::Char('w')).unwrap_or(&false) {
@@ -307,10 +301,10 @@ impl Player {
 
         let (_, player_sprite_width, player_sprite_height) = self.get_sprite_content();
 
-        let collision_box_x = new_player_x
+        let collision_box_x = (new_player_x as u16)
             .saturating_add(player_sprite_width / 2)
             .saturating_sub(PLAYER_COLLISION_WIDTH / 2);
-        let collision_box_y = new_player_y
+        let collision_box_y = (new_player_y as u16)
             .saturating_add(player_sprite_height)
             .saturating_sub(PLAYER_COLLISION_HEIGHT);
 
@@ -341,8 +335,8 @@ impl Player {
                 self.x = original_player_x;
                 self.y = original_player_y;
             } else {
-                self.x = new_player_x.min(current_map.width.saturating_sub(player_sprite_width));
-                self.y = new_player_y.min(current_map.height.saturating_sub(player_sprite_height));
+                self.x = new_player_x.min((current_map.width.saturating_sub(player_sprite_width)) as f32);
+                self.y = new_player_y.min((current_map.height.saturating_sub(player_sprite_height)) as f32);
             }
         } else {
             self.x = new_player_x;

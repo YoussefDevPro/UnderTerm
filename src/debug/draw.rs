@@ -41,8 +41,8 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
     }
 
     // spawn point
-    let spawn_x = game_state.player.x;
-    let spawn_y = game_state.player.y;
+    let spawn_x = game_state.player.x as u16;
+    let spawn_y = game_state.player.y as u16;
 
     let spawn_x_on_screen = spawn_x.saturating_sub(game_state.camera_x);
     let spawn_y_on_screen = spawn_y.saturating_sub(game_state.camera_y);
@@ -59,14 +59,10 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
 
     // player collision box
     let (_, player_sprite_width, player_sprite_height) = game_state.player.get_sprite_content();
-    let collision_box_start_x = game_state
-        .player
-        .x
+    let collision_box_start_x = (game_state.player.x as u16)
         .saturating_add(player_sprite_width / 2)
         .saturating_sub(COLLISION_BOX_WIDTH / 2);
-    let collision_box_start_y = game_state
-        .player
-        .y
+    let collision_box_start_y = (game_state.player.y as u16)
         .saturating_add(player_sprite_height)
         .saturating_sub(COLLISION_BOX_HEIGHT);
 
@@ -177,7 +173,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         && game_state.select_box_start_coords.is_some()
     {
         if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-            let (end_x, end_y) = (game_state.player.x, game_state.player.y);
+            let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
 
             let rect_x = start_x.min(end_x);
             let rect_y = start_y.min(end_y);
@@ -212,17 +208,17 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
 
 fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     let size = frame.area();
-    let player_x_on_screen = game_state.player.x.saturating_sub(game_state.camera_x);
-    let player_y_on_screen = game_state.player.y.saturating_sub(game_state.camera_y);
+    let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
+    let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
     let (map_width, map_height, map_kind) = game_state
         .loaded_maps
         .get(&current_map_key)
-        .map(|m| (m.width, m.height, format!("{:?}", m.kind)))
+        .map(|m| (m.width, m.height, format!(r"{:?}", m.kind)))
         .unwrap_or((0, 0, "N/A".to_string()));
 
     let mut debug_text = vec![
-        format!("Player: ({}, {})", game_state.player.x, game_state.player.y),
+        format!("Player: ({:.2}, {:.2})", game_state.player.x, game_state.player.y),
         format!("Direction: {:?}", game_state.player.direction),
         format!("Animation Frame: {}", game_state.player.animation_frame),
         format!("Is Walking: {}", game_state.player.is_walking),
@@ -272,3 +268,4 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     frame.render_widget(Clear, debug_panel_rect);
     frame.render_widget(debug_paragraph, debug_panel_rect);
 }
+
