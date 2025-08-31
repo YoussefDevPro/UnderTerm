@@ -53,14 +53,16 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         }
     }
 
-    let mut drawable_elements: Vec<(u16, u8, Text<'static>, u16, u16, u16, u16)> = Vec::new(); // (y_sort_key, z_index, ansi_content, x, y, width, height) ദ്ദി/ᐠ｡‸｡ᐟ\
+    let mut drawable_elements: Vec<(i32, u8, Text<'static>, i32, i32, u16, u16)> = Vec::new(); // (y_sort_key, z_index, ansi_content, x, y, width, height) ദ്ദി/ᐠ｡‸｡ᐟ\
 
     let (player_sprite_content, player_sprite_width, player_sprite_height) =
         game_state.player.get_sprite_content();
-    let player_x_on_screen = (game_state.player.x as u16).saturating_sub(game_state.camera_x);
-    let player_y_on_screen = (game_state.player.y as u16).saturating_sub(game_state.camera_y);
+    let player_x_on_screen =
+        (game_state.player.x as i32).saturating_sub(game_state.camera_x as i32);
+    let player_y_on_screen =
+        (game_state.player.y as i32).saturating_sub(game_state.camera_y as i32);
     drawable_elements.push((
-        player_y_on_screen + player_sprite_height,
+        player_y_on_screen + player_sprite_height as i32,
         1,
         player_sprite_content,
         player_x_on_screen,
@@ -71,10 +73,10 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     if game_state.is_placing_sprite {
         if let Some(pending_sprite) = &game_state.pending_placed_sprite {
-            let sprite_x_on_screen = pending_sprite.x as u16 - game_state.camera_x;
-            let sprite_y_on_screen = pending_sprite.y as u16 - game_state.camera_y;
+            let sprite_x_on_screen = pending_sprite.x as i32 - game_state.camera_x as i32;
+            let sprite_y_on_screen = pending_sprite.y as i32 - game_state.camera_y as i32;
             drawable_elements.push((
-                sprite_y_on_screen + pending_sprite.height as u16,
+                sprite_y_on_screen + pending_sprite.height as i32,
                 0,
                 pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
                 sprite_x_on_screen,
@@ -87,10 +89,10 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
         for placed_sprite in &current_map.placed_sprites {
-            let sprite_x_on_screen = placed_sprite.x as u16 - game_state.camera_x;
-            let sprite_y_on_screen = placed_sprite.y as u16 - game_state.camera_y;
+            let sprite_x_on_screen = placed_sprite.x as i32 - game_state.camera_x as i32;
+            let sprite_y_on_screen = placed_sprite.y as i32 - game_state.camera_y as i32;
             drawable_elements.push((
-                sprite_y_on_screen + placed_sprite.height as u16,
+                sprite_y_on_screen + placed_sprite.height as i32,
                 0,
                 placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
                 sprite_x_on_screen,
@@ -103,8 +105,30 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     drawable_elements.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
-    for (_, _, text, x, y, width, height) in drawable_elements {
-        draw_sprite(frame, game_state, text, x, y, width, height);
+    for (_, _, text, abs_x, abs_y, width, height) in drawable_elements {
+        let sprite_x_relative_to_camera = abs_x;
+        let sprite_y_relative_to_camera = abs_y;
+        let draw_x = sprite_x_relative_to_camera.max(0) as u16;
+        let draw_y = sprite_y_relative_to_camera.max(0) as u16;
+        let offset_x = if sprite_x_relative_to_camera < 0 {
+            -sprite_x_relative_to_camera
+        } else {
+            0
+        };
+        let offset_y = if sprite_y_relative_to_camera < 0 {
+            -sprite_y_relative_to_camera
+        } else {
+            0
+        };
+        let actual_width = (width as i32 - offset_x).max(0) as u16;
+        let actual_height = (height as i32 - offset_y).max(0) as u16;
+
+        let darkened_sprite = game_state.darken_text(text, game_state.deltarune.level);
+        let paragraph = Paragraph::new(darkened_sprite).scroll((offset_y as u16, offset_x as u16));
+        let potential_render_rect =
+            ratatui::layout::Rect::new(draw_x, draw_y, actual_width, actual_height);
+        let final_render_rect = potential_render_rect.intersection(frame.area());
+        frame.render_widget(paragraph, final_render_rect);
     }
 
     if game_state.debug_mode {
@@ -353,45 +377,5 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let y = (size.height.saturating_sub(text_height)) / 2;
         let area = ratatui::layout::Rect::new(x, y, text_width, text_height);
         frame.render_widget(paragraph, area);
-    }
-}
-
-fn draw_sprite(
-    frame: &mut Frame,
-    game_state: &mut GameState,
-    sprite_content: Text<'static>,
-    sprite_x: u16,
-    sprite_y: u16,
-    sprite_width: u16,
-    sprite_height: u16,
-) {
-    let size = frame.area();
-    let darkened_sprite = game_state.darken_text(sprite_content, game_state.deltarune.level);
-    let paragraph = Paragraph::new(darkened_sprite);
-
-    let rect = ratatui::layout::Rect::new(0, 0, sprite_width, sprite_height);
-    let mut buffer = Buffer::empty(rect);
-    paragraph.render(rect, &mut buffer);
-
-    for y in 0..sprite_height {
-        for x in 0..sprite_width {
-            let cell = &buffer[(x, y)];
-            let is_space = cell.symbol() == " ";
-            let has_bg = cell.bg != Color::Reset;
-
-            if !is_space || has_bg {
-                let screen_x = sprite_x.saturating_add(x);
-                let screen_y = sprite_y.saturating_add(y);
-                if screen_x < size.width && screen_y < size.height {
-                    let frame_cell = &mut frame.buffer_mut()[(screen_x, screen_y)];
-                    frame_cell.set_symbol(cell.symbol());
-                    frame_cell.set_fg(cell.fg);
-                    frame_cell.modifier = cell.modifier;
-                    if has_bg {
-                        frame_cell.set_bg(cell.bg);
-                    }
-                }
-            }
-        }
     }
 }
