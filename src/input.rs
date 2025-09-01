@@ -9,7 +9,7 @@ use serde_json;
 use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
 
-fn handle_battle_input(battle_state: &mut BattleState, key_code: KeyCode, audio: &crate::audio::Audio) {
+fn handle_battle_input(battle_state: &mut BattleState, key_code: KeyCode, audio: &mut crate::audio::Audio) {
     match battle_state.mode {
         BattleMode::Menu => match key_code {
             KeyCode::Left => {
@@ -146,7 +146,7 @@ pub fn process_events(
     rx: &mpsc::Receiver<Event>,
     game_state: &mut GameState,
     key_states: &mut HashMap<KeyCode, bool>,
-    audio: &crate::audio::Audio,
+    audio: &mut crate::audio::Audio,
 ) -> io::Result<bool> {
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {

@@ -3,7 +3,7 @@ use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
 use rand::Rng;
-use ratatui::text::{Line, Span, Text};
+use ratatui::prelude::{Line, Rect, Span, Text};
 
 use std::time::Duration;
 
@@ -32,8 +32,14 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
     if !battle_state.enemy.sprite_frames.is_empty() {
         let enemy_sprite = battle_state.enemy.sprite_frames[battle_state.enemy.current_frame].clone();
         let mut enemy_text = enemy_sprite.as_bytes().into_text().unwrap();
-        let enemy_width = enemy_text.width() as u16;
-        let enemy_height = enemy_text.height() as u16;
+        let enemy_height = enemy_text.lines.len() as u16;
+        let mut enemy_width = 0;
+        for line in enemy_text.lines.iter() {
+            let line_width = line.width() as u16;
+            if line_width > enemy_width {
+                enemy_width = line_width;
+            }
+        }
 
         // Clamp enemy dimensions to the available area
         let enemy_draw_width = enemy_width.min(chunks[0].width);
@@ -131,7 +137,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         let button_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 165, 0))); // Orange border
+            .border_style(Style::default().fg(Color::Rgb(255, 165, 0)).bg(Color::Rgb(0, 0, 0))); // Orange border
 
         frame.render_widget(button_block, *area);
         frame.render_widget(Paragraph::new(button_text), *area);
@@ -140,7 +146,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
     // Main content box
     let box_block = Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Thick);
+        .border_type(BorderType::Thick).border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
     let box_area = player_chunks[0];
     frame.render_widget(box_block.clone(), box_area);
 
@@ -213,7 +219,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             };
             battle_state.bullet_board_size = (board_area.width, board_area.height);
 
-            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Rgb(0, 0, 0)));
+            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Rgb(0, 0, 0))).border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
             frame.render_widget(board_block, board_area);
 
             let heart_sprite = "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ";
@@ -225,7 +231,11 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
 
             let heart_area = ratatui::layout::Rect::new(heart_x, heart_y, battle_state.player_heart.width, battle_state.player_heart.height);
             let heart_paragraph = Paragraph::new(heart_sprite).style(Style::default().fg(Color::Rgb(255, 0, 0)));
-            frame.render_widget(heart_paragraph, heart_area);
+            if battle_state.is_flickering && battle_state.flicker_timer.elapsed().as_millis() % 200 < 100 {
+                // Don't draw the heart if flickering and in the "off" phase
+            } else {
+                frame.render_widget(heart_paragraph, heart_area);
+            }
 
             // Draw bullets
             for bullet in &battle_state.bullets {
@@ -235,6 +245,38 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
                     let bullet_p = Paragraph::new(bullet.symbol.clone()).style(Style::default().fg(Color::Rgb(255, 255, 255)));
                     frame.render_widget(bullet_p, ratatui::layout::Rect::new(bullet_x, bullet_y, bullet.width, bullet.height));
                 }
+            }
+
+            // Draw gun if present
+            if let Some(gun_state) = &game_state.battle_state.as_ref().unwrap().gun_state {
+                use crate::game::battle::GunState;
+                use crate::game::battle::GunDirection;
+                use ansi_to_tui::IntoText;
+
+                let (gun_art, gun_width, gun_height) = match gun_state {
+                    GunState::Charging { direction, .. } | GunState::Firing { direction, .. } => {
+                        match direction {
+                            GunDirection::Up => ("  ▲  \n █ \n███", 5, 3),
+                            GunDirection::Down => ("███\n █ \n  ▼  ", 5, 3),
+                            GunDirection::Left => (" █───\n████ \n █───", 6, 3),
+                            GunDirection::Right => ("───█ \n ████\n───█ ", 6, 3),
+                        }
+                    }
+                };
+
+                let (gun_x, gun_y, _) = match gun_state {
+                    GunState::Charging { x, y, direction, .. } => (*x, *y, direction),
+                    GunState::Firing { x, y, direction, .. } => (*x, *y, direction),
+                };
+
+                let gun_text = gun_art.as_bytes().into_text().unwrap();
+                let gun_paragraph = Paragraph::new(gun_text).style(Style::default().fg(Color::Rgb(255, 255, 0)));
+
+                let draw_x = board_area.x + gun_x as u16;
+                let draw_y = board_area.y + gun_y as u16;
+
+                let gun_rect = ratatui::layout::Rect::new(draw_x, draw_y, gun_width, gun_height);
+                frame.render_widget(gun_paragraph, gun_rect);
             }
         }
         BattleMode::GameOverTransition => {
@@ -335,6 +377,188 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     } else if game_state.game_over_active {
         draw_game_over(frame);
         return;
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
+    } else if game_state.battle_transition_timer.is_some() {
+        // Draw map and player (already drawn by default)
+
+        // Calculate transition progress
+        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
+        let transition_duration = Duration::from_millis(300);
+        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
+
+        // Calculate shrinking rectangle (from full screen to battle box size)
+        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
+        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
+        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
+        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
+
+        // Draw black rectangle that grows from edges towards center
+        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
+        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
+        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
+        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
+
+        frame.render_widget(Clear, top_rect);
+        frame.render_widget(Clear, bottom_rect);
+        frame.render_widget(Clear, left_rect);
+        frame.render_widget(Clear, right_rect);
+
+        return; // Don't draw overworld map again
     }
 
     frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);

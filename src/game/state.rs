@@ -3,6 +3,7 @@ use super::deltarune::Deltarune;
 use super::face::FaceManager;
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
+use crate::game::battle::BattleMode;
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
 use rand::thread_rng;
@@ -14,12 +15,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
 use std::time::{Duration, Instant};
-use crate::game::battle::BattleMode;
 
 fn default_instant() -> Instant {
     Instant::now()
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TeleportCreationState {
@@ -120,6 +119,8 @@ pub struct GameState {
     #[serde(skip)]
     pub face_manager: FaceManager,
     pub game_over_active: bool,
+    #[serde(skip)]
+    pub battle_transition_timer: Option<Instant>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -201,6 +202,7 @@ impl GameState {
             pending_teleport_destination: None,
             face_manager: FaceManager::new(),
             game_over_active: false,
+            battle_transition_timer: None,
         }
     }
 
@@ -214,7 +216,6 @@ impl GameState {
     }
 
     pub fn load_game_state() -> io::Result<Self> {
-        // Always load map_0_0 for now as per user request
         let map = Map::load("map_0_0").map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -222,7 +223,6 @@ impl GameState {
             )
         })?;
         let mut game_state = GameState::from_map(map.clone());
-        // Ensure player spawns at map_0_0's spawn point
         game_state.player.x = map.player_spawn.0 as f32;
         game_state.player.y = map.player_spawn.1 as f32;
         Ok(game_state)
@@ -243,8 +243,26 @@ impl GameState {
         key_states: &HashMap<KeyCode, bool>,
         frame_size: ratatui::layout::Rect,
         delta_time: std::time::Duration,
-        audio: &crate::audio::Audio,
+        audio: &mut crate::audio::Audio,
     ) {
+        // Handle battle transition
+        if let Some(timer) = self.battle_transition_timer {
+            let elapsed = timer.elapsed();
+            let transition_duration = Duration::from_millis(300); // 0.3 seconds
+
+            if elapsed < transition_duration {
+                let progress = elapsed.as_secs_f32() / transition_duration.as_secs_f32();
+                self.deltarune.level = (progress * 100.0) as u8; // Fade to black
+            } else {
+                self.deltarune.level = 0; // Reset darkness
+                self.is_battle_active = true; // Start battle
+                self.battle_page_active = true; // Start battle page
+                self.battle_transition_timer = None; // End transition
+                self.battle_state = Some(BattleState::new()); // Reset battle state
+            }
+            return; // Don't process other updates during transition
+        }
+
         // Handle flicker effect
         if self.is_flickering {
             if self.flicker_timer.elapsed() >= self.flicker_duration {
@@ -537,17 +555,11 @@ impl GameState {
                 if battle_zone.to_rect().intersects(player_collision_rect) {
                     if !self.is_battle_active || self.active_battle_zone_id != Some(battle_zone.id)
                     {
-                        self.is_battle_active = true;
-                        self.active_battle_zone_id = Some(battle_zone.id);
-                        self.message = format!("Entered Battle Zone {}", battle_zone.id);
-                        self.show_message = true;
-                        self.message_animation_start_time = Instant::now();
-                        self.animated_message_content.clear();
-                        // Trigger flicker
-                        self.is_flickering = true;
-                        self.flicker_timer = Instant::now();
-                        self.flicker_count = 10; // Reset flicker count
-                        self.show_flicker_black_screen = false; // Start with game screen
+                        // Trigger battle transition
+                        self.battle_transition_timer = Some(Instant::now());
+                        self.is_battle_active = false; // Temporarily set to false
+                        self.active_battle_zone_id = Some(battle_zone.id); // Keep track of which battle zone triggered it
+                        self.is_flickering = false; // Reset flicker from encounter
                         audio.play_enemy_encounter_sound();
                     }
                 }
@@ -800,7 +812,7 @@ impl GameState {
 
 // delt the color seems better :3
 fn darken_color(color: Color, darkness_level: u8) -> Color {
-    let factor = 1.0 - (darkness_level as f32 / 100.0);
+    let factor = 1.0 - (darkness_level as f32 / 90.0);
     match color {
         Color::Rgb(r, g, b) => Color::Rgb(
             (r as f32 * factor) as u8,

@@ -27,7 +27,7 @@ pub fn run(
     });
 
     let mut last_frame_time = Instant::now();
-    let audio = Audio::new().unwrap();
+    let mut audio = Audio::new().unwrap();
 
     let mut key_states: HashMap<crossterm::event::KeyCode, bool> = HashMap::new();
 
@@ -37,7 +37,7 @@ pub fn run(
             let delta_time = last_frame_time.elapsed();
             last_frame_time = Instant::now();
 
-            if input::process_events(&rx, game_state, &mut key_states, &audio)? {
+            if input::process_events(&rx, game_state, &mut key_states, &mut audio)? {
                 return Ok(());
             }
 
@@ -55,7 +55,7 @@ pub fn run(
                     current_frame_size.height,
                 ),
                 delta_time,
-                &audio,
+                &mut audio,
             );
 
             terminal.draw(|frame| {

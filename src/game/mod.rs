@@ -6,3 +6,4 @@ pub mod utils;
 pub mod deltarune;
 pub mod battle;
 pub mod face;
+pub mod attack;
