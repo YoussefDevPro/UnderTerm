@@ -13,7 +13,7 @@ pub struct Bullet {
     pub bounces_remaining: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AttackType {
     Simple,
     Bouncing,

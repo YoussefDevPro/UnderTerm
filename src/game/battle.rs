@@ -1,10 +1,10 @@
+use crate::game::attack::{Attack, AttackType, Bullet};
 use crossterm::event::KeyCode;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::time::{Duration, Instant};
-use crate::game::attack::{Attack, AttackType, Bullet};
 
 const VERTICAL_SPEED_FACTOR: f32 = 0.5;
 
@@ -120,19 +120,55 @@ pub struct BattleState {
     pub flicker_timer: Instant,
     #[serde(skip)]
     pub flicker_duration: Duration,
-    #[serde(skip)]
     pub gun_state: Option<GunState>,
+    #[serde(skip)]
+    pub wave_splash_state: Option<WaveSplashState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum WaveSplashState {
+    Charging {
+        #[serde(skip, default = "default_instant")]
+        start_time: Instant,
+        duration: Duration,
+        x: f32,
+        y: f32,
+    },
+    Firing {
+        #[serde(skip, default = "default_instant")]
+        start_time: Instant,
+        duration: Duration,
+        x: f32,
+        y: f32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GunState {
-    Charging { start_time: Instant, duration: Duration, x: f32, y: f32, direction: GunDirection },
-    Firing { start_time: Instant, duration: Duration, x: f32, y: f32, direction: GunDirection },
+    Charging {
+        #[serde(skip, default = "default_instant")]
+        start_time: Instant,
+        duration: Duration,
+        x: f32,
+        y: f32,
+        direction: GunDirection,
+    },
+    Firing {
+        #[serde(skip, default = "default_instant")]
+        start_time: Instant,
+        duration: Duration,
+        x: f32,
+        y: f32,
+        direction: GunDirection,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GunDirection {
-    Up, Down, Left, Right
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
 impl BattleState {
@@ -170,17 +206,18 @@ impl BattleState {
                     spawn_rate: 0.05,
                     wave_amplitude: None,
                     wave_frequency: None,
-            },
-            Attack {
-                attack_type: AttackType::Wave,
-                duration: Duration::from_secs(8),
-                damage: 2,
-                bullet_speed: 40.0,
-                bullet_symbol: "~".to_string(),
-                spawn_rate: 0.08,
-                wave_amplitude: Some(10.0),
-                wave_frequency: Some(0.5),
-            }],
+                },
+                Attack {
+                    attack_type: AttackType::Wave,
+                    duration: Duration::from_secs(8),
+                    damage: 2,
+                    bullet_speed: 40.0,
+                    bullet_symbol: "~".to_string(),
+                    spawn_rate: 0.08,
+                    wave_amplitude: Some(10.0),
+                    wave_frequency: Some(0.5),
+                },
+            ],
             shake_timer: Instant::now(),
             is_shaking: false,
         };
@@ -222,6 +259,8 @@ impl BattleState {
             is_flickering: false,
             flicker_timer: Instant::now(),
             flicker_duration: Duration::from_secs(2),
+            gun_state: None,
+            wave_splash_state: None,
         }
     }
 
@@ -299,69 +338,77 @@ impl BattleState {
 
                     if let Some(attack) = &self.current_attack {
                         if attack.attack_type == AttackType::Wave {
-                            // Initialize gun state
-                            let side = rng.gen_range(0..4); // 0: top, 1: bottom, 2: left, 3: right
-                            let (gun_x, gun_y, gun_direction) = match side {
-                                0 => (rng.gen_range(0.0..self.bullet_board_size.0 as f32), 0.0, GunDirection::Down),
-                                1 => (rng.gen_range(0.0..self.bullet_board_size.0 as f32), self.bullet_board_size.1 as f32, GunDirection::Up),
-                                2 => (0.0, rng.gen_range(0.0..self.bullet_board_size.1 as f32), GunDirection::Right),
-                                3 => (self.bullet_board_size.0 as f32, rng.gen_range(0.0..self.bullet_board_size.1 as f32), GunDirection::Left),
-                                _ => unreachable!(),
-                            };
-                            self.gun_state = Some(GunState::Charging {
+                            let (x, y) = (
+                                rng.gen_range(0.0..self.bullet_board_size.0 as f32),
+                                rng.gen_range(0.0..self.bullet_board_size.1 as f32),
+                            );
+                            self.wave_splash_state = Some(WaveSplashState::Charging {
                                 start_time: Instant::now(),
                                 duration: Duration::from_secs(1), // 1 second charge time
-                                x: gun_x,
-                                y: gun_y,
-                                direction: gun_direction,
+                                x,
+                                y,
                             });
                         }
                     }
+
+                    
                 }
 
                 if let Some(attack) = &self.current_attack {
-                    if attack.attack_type == AttackType::Wave {
-                        if let Some(gun_state) = &mut self.gun_state {
-                            match gun_state {
-                                GunState::Charging { start_time, duration, x, y, direction } => {
+                    
+                        if self.attack_timer.elapsed() >= attack.duration {
+                        self.current_attack = None;
+                        self.mode = BattleMode::Menu; // Go back to menu after attack
+                        self.gun_state = None; // Clear gun state
+                        self.wave_splash_state = None; // Clear wave splash state
+                    } else if attack.attack_type == AttackType::Wave {
+                        if let Some(wave_state) = &mut self.wave_splash_state {
+                            match wave_state {
+                                WaveSplashState::Charging {
+                                    start_time,
+                                    duration,
+                                    x,
+                                    y,
+                                } => {
                                     if start_time.elapsed() >= *duration {
-                                        *gun_state = GunState::Firing {
+                                        *wave_state = WaveSplashState::Firing {
                                             start_time: Instant::now(),
-                                            duration: Duration::from_secs(5), // Firing duration
+                                            duration: Duration::from_secs(2), // Firing duration
                                             x: *x,
                                             y: *y,
-                                            direction: *direction,
                                         };
                                     }
                                 }
-                                GunState::Firing { start_time: _, duration: _, x, y, direction } => {
-                                    // Spawn bullets from gun
+                                WaveSplashState::Firing {
+                                    start_time: _,
+                                    duration: _,
+                                    x,
+                                    y,
+                                } => {
+                                    // Spawn bullets in a radial pattern
                                     if rand::thread_rng().gen_bool(attack.spawn_rate) {
-                                        let (vx, vy) = match direction {
-                                            GunDirection::Up => (0.0, -attack.bullet_speed),
-                                            GunDirection::Down => (0.0, attack.bullet_speed),
-                                            GunDirection::Left => (-attack.bullet_speed, 0.0),
-                                            GunDirection::Right => (attack.bullet_speed, 0.0),
-                                        };
-                                        let bullet = Bullet {
-                                            x: *x,
-                                            y: *y,
-                                            vx,
-                                            vy,
-                                            width: 1,
-                                            height: 1,
-                                            symbol: attack.bullet_symbol.clone(),
-                                            bounces_remaining: 0,
-                                        };
-                                        self.bullets.push(bullet);
+                                        let num_bullets = 8; // Number of bullets in the splash
+                                        for i in 0..num_bullets {
+                                            let angle = (i as f32 / num_bullets as f32) * 2.0 * std::f32::consts::PI;
+                                            let vx = attack.bullet_speed * angle.cos();
+                                            let vy = attack.bullet_speed * angle.sin();
+
+                                            let bullet = Bullet {
+                                                x: *x,
+                                                y: *y,
+                                                vx,
+                                                vy,
+                                                width: 1,
+                                                height: 1,
+                                                symbol: attack.bullet_symbol.clone(),
+                                                bounces_remaining: 0,
+                                            };
+                                            self.bullets.push(bullet);
+                                        }
                                     }
                                 }
                             }
                         }
-                    } else if self.attack_timer.elapsed() >= attack.duration {
-                        self.current_attack = None;
-                        self.mode = BattleMode::Menu; // Go back to menu after attack
-                        self.gun_state = None; // Clear gun state
                     } else {
                         // Spawn bullets based on attack pattern
                         if rand::thread_rng().gen_bool(attack.spawn_rate) {
@@ -370,25 +417,29 @@ impl BattleState {
                                     let mut rng = rand::thread_rng();
                                     let side = rng.gen_range(0..4); // 0: top, 1: bottom, 2: left, 3: right
                                     let (start_x, start_y, target_x, target_y) = match side {
-                                        0 => ( // Top
+                                        0 => (
+                                            // Top
                                             rng.gen_range(0.0..self.bullet_board_size.0 as f32),
                                             0.0,
                                             self.player_heart.x,
                                             self.player_heart.y,
                                         ),
-                                        1 => ( // Bottom
+                                        1 => (
+                                            // Bottom
                                             rng.gen_range(0.0..self.bullet_board_size.0 as f32),
                                             self.bullet_board_size.1 as f32,
                                             self.player_heart.x,
                                             self.player_heart.y,
                                         ),
-                                        2 => ( // Left
+                                        2 => (
+                                            // Left
                                             0.0,
                                             rng.gen_range(0.0..self.bullet_board_size.1 as f32),
                                             self.player_heart.x,
                                             self.player_heart.y,
                                         ),
-                                        3 => ( // Right
+                                        3 => (
+                                            // Right
                                             self.bullet_board_size.0 as f32,
                                             rng.gen_range(0.0..self.bullet_board_size.1 as f32),
                                             self.player_heart.x,
@@ -401,7 +452,10 @@ impl BattleState {
                                     let dy = target_y - start_y;
                                     let distance = (dx * dx + dy * dy).sqrt();
                                     let (vx, vy) = if distance > 0.0 {
-                                        (attack.bullet_speed * dx / distance, attack.bullet_speed * dy / distance)
+                                        (
+                                            attack.bullet_speed * dx / distance,
+                                            attack.bullet_speed * dy / distance,
+                                        )
                                     } else {
                                         (0.0, attack.bullet_speed) // Fallback if bullet and target are at the same spot
                                     };
@@ -420,29 +474,45 @@ impl BattleState {
                                 AttackType::Bouncing => {
                                     let side = rand::thread_rng().gen_range(0..4);
                                     let (x, y, vx, vy) = match side {
-                                        0 => ( // Top
-                                            rand::thread_rng().gen_range(0.0..self.bullet_board_size.0 as f32),
+                                        0 => (
+                                            // Top
+                                            rand::thread_rng()
+                                                .gen_range(0.0..self.bullet_board_size.0 as f32),
                                             0.0,
-                                            rand::thread_rng().gen_range(-attack.bullet_speed..=attack.bullet_speed),
+                                            rand::thread_rng().gen_range(
+                                                -attack.bullet_speed..=attack.bullet_speed,
+                                            ),
                                             attack.bullet_speed,
                                         ),
-                                        1 => ( // Bottom
-                                            rand::thread_rng().gen_range(0.0..self.bullet_board_size.0 as f32),
+                                        1 => (
+                                            // Bottom
+                                            rand::thread_rng()
+                                                .gen_range(0.0..self.bullet_board_size.0 as f32),
                                             self.bullet_board_size.1 as f32,
-                                            rand::thread_rng().gen_range(-attack.bullet_speed..=attack.bullet_speed),
+                                            rand::thread_rng().gen_range(
+                                                -attack.bullet_speed..=attack.bullet_speed,
+                                            ),
                                             -attack.bullet_speed,
                                         ),
-                                        2 => ( // Left
+                                        2 => (
+                                            // Left
                                             0.0,
-                                            rand::thread_rng().gen_range(0.0..self.bullet_board_size.1 as f32),
+                                            rand::thread_rng()
+                                                .gen_range(0.0..self.bullet_board_size.1 as f32),
                                             attack.bullet_speed,
-                                            rand::thread_rng().gen_range(-attack.bullet_speed..=attack.bullet_speed),
+                                            rand::thread_rng().gen_range(
+                                                -attack.bullet_speed..=attack.bullet_speed,
+                                            ),
                                         ),
-                                        3 => ( // Right
+                                        3 => (
+                                            // Right
                                             self.bullet_board_size.0 as f32,
-                                            rng.gen_range(0.0..self.bullet_board_size.1 as f32),
+                                            rand::thread_rng()
+                                                .gen_range(0.0..self.bullet_board_size.1 as f32),
                                             -attack.bullet_speed,
-                                            rand::thread_rng().gen_range(-attack.bullet_speed..=attack.bullet_speed),
+                                            rand::thread_rng().gen_range(
+                                                -attack.bullet_speed..=attack.bullet_speed,
+                                            ),
                                         ),
                                         _ => unreachable!(),
                                     };
@@ -456,24 +526,25 @@ impl BattleState {
                                         symbol: attack.bullet_symbol.clone(),
                                         bounces_remaining: 3,
                                     }
-                                },
+                                }
                                 AttackType::Wave => {
                                     // This block is now handled by gun_state
                                     unreachable!("Wave attack should be handled by gun_state");
-                                },
+                                }
                             };
                             self.bullets.push(bullet);
                         }
                     }
+                }
 
                 // Update bullet positions and handle bouncing
                 for bullet in &mut self.bullets {
                     bullet.x += bullet.vx * delta_time.as_secs_f32();
                     bullet.y += bullet.vy * delta_time.as_secs_f32();
 
-                    match self.current_attack.as_ref().map(|a| &a.attack_type) {
-                        _ => {}
-                    }
+                    // No need for a separate match here, the logic is self-contained.
+                    // The _ => {} block was the source of the error.
+                    // The bullet logic below already handles the bouncing logic for the different attack types.
 
                     // Bouncing logic
                     if bullet.bounces_remaining > 0 {
@@ -507,7 +578,7 @@ impl BattleState {
                         Some(AttackType::Simple) => !is_off_screen, // Retain if not off screen
                         Some(AttackType::Bouncing) => !is_off_screen && b.bounces_remaining > 0, // Retain if not off screen and still bouncing
                         Some(AttackType::Wave) => !is_off_screen, // Retain if not off screen
-                        _ => false, // Should not happen
+                        _ => false,                               // Should not happen
                     }
                 });
 
@@ -524,6 +595,18 @@ impl BattleState {
                 if *key_states.get(&KeyCode::Right).unwrap_or(&false) {
                     self.player_heart.x += speed * delta_time.as_secs_f32();
                 }
+
+                // Clamp heart position to bullet board
+                self.player_heart.x = self
+                    .player_heart
+                    .x
+                    .max(0.0)
+                    .min(self.bullet_board_size.0 as f32 - self.player_heart.width as f32);
+                self.player_heart.y = self
+                    .player_heart
+                    .y
+                    .max(0.0)
+                    .min(self.bullet_board_size.1 as f32 - self.player_heart.height as f32);
 
                 // Collision detection
                 let heart_rect = ratatui::layout::Rect::new(
@@ -543,7 +626,7 @@ impl BattleState {
                     if heart_rect.intersects(bullet_rect) {
                         if !self.is_flickering {
                             // Only take damage if not flickering
-                            self.player_hp -= damage;
+                            self.player_hp = (self.player_hp - damage).max(0);
                             self.is_flickering = true;
                             self.flicker_timer = Instant::now();
                         }
@@ -558,25 +641,13 @@ impl BattleState {
                     self.is_flickering = false;
                 }
 
-                // Clamp heart position to bullet board
-                self.player_heart.x = self
-                    .player_heart
-                    .x
-                    .max(0.0)
-                    .min(self.bullet_board_size.0 as f32 - self.player_heart.width as f32);
-                self.player_heart.y = self
-                    .player_heart
-                    .y
-                    .max(0.0)
-                    .min(self.bullet_board_size.1 as f32 - self.player_heart.height as f32);
-
                 if self.player_hp <= 0 {
                     self.mode = BattleMode::GameOverTransition;
                     self.game_over_timer = Instant::now();
                 }
             }
             BattleMode::GameOverTransition => {
-                if self.game_over_timer.elapsed() > Duration::from_secs(2) {
+                if self.game_over_timer.elapsed() > Duration::from_secs(3) {
                     self.mode = BattleMode::GameOver;
                 }
             }

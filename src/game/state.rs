@@ -263,7 +263,6 @@ impl GameState {
             return; // Don't process other updates during transition
         }
 
-        // Handle flicker effect
         if self.is_flickering {
             if self.flicker_timer.elapsed() >= self.flicker_duration {
                 self.show_flicker_black_screen = !self.show_flicker_black_screen;
@@ -277,11 +276,9 @@ impl GameState {
                     self.show_flicker_black_screen = false; // Ensure not black when transitioning
                 }
             }
-            // Block other updates during flicker
             return;
         }
 
-        // If battle page is active, run battle update
         if self.battle_page_active {
             if let Some(battle_state) = &mut self.battle_state {
                 battle_state.update(delta_time, key_states, audio);

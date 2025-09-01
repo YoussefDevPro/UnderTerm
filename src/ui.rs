@@ -7,6 +7,12 @@ use ratatui::prelude::{Line, Rect, Span, Text};
 
 use std::time::Duration;
 
+const FIGHT_ASCII: &str = "▄                      \n █    █▀▀ ▀ █▀▀ █ █ ▀█▀\n  █▄▀ █▀  █ █▄█ █▀█  █ \n ▀ ▀▄                  ";
+const MERCY_ASCII: &str = "▀▄ ▄▀  █▀▄▀█ █▀█ █▀█ █▀ █ █\n ▄▀▄   █ ▀ █ █▄▄ █   █▄  █ \n▀   ▀                  ";
+const ACT_ASCII: &str = "  ▄            \n▄  █ ▄▀█ █▀ ▀█▀\n █ █ █▀█ █▄  █ \n▀  █           \n  ▀            ";
+const ITEM_ASCII: &str = " ▀▀▀  ▀ ▀█▀ █▀█ █▀▄▀█\n■███■ █  █  █▄▄ █ ▀ █\n  ▀                  ";
+const SELECTED_HEART_ASCII: &str = " ▄ ▄ \n■█▄█■\n ▀█▀ ";
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
@@ -104,35 +110,47 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         .split(button_area);
 
     let buttons = [
-        (BattleButton::Fight, "FIGHT", buttons_layout[0]),
-        (BattleButton::Act, "ACT", buttons_layout[1]),
-        (BattleButton::Item, "ITEM", buttons_layout[2]),
-        (BattleButton::Mercy, "MERCY", buttons_layout[3]),
+        (BattleButton::Fight, FIGHT_ASCII, buttons_layout[0]),
+        (BattleButton::Act, ACT_ASCII, buttons_layout[1]),
+        (BattleButton::Item, ITEM_ASCII, buttons_layout[2]),
+        (BattleButton::Mercy, MERCY_ASCII, buttons_layout[3]),
     ];
 
-    for (button_type, text, area) in &buttons {
+    let heart_lines: Vec<String> = SELECTED_HEART_ASCII.lines().map(|s| s.to_string()).collect();
+
+    for (button_type, ascii_art, area) in &buttons {
         let mut style = Style::default().fg(Color::Rgb(255, 165, 0)); // Orange
         if *button_type == BattleButton::Mercy {
             style = Style::default().fg(Color::Rgb(128, 128, 128));
         }
 
-        let button_text = if battle_state.selected_button == *button_type {
-            vec![
-                Line::from(""),
-                Line::from(vec![ 
-                    Span::styled("❤ ", Style::default().fg(Color::Rgb(255, 0, 0))),
-                    Span::styled(*text, style),
-                ]),
-            ]
-        } else {
-            vec![
-                Line::from(""),
-                Line::from(vec![ 
-                    Span::raw("  "),
-                    Span::styled(*text, style),
-                ]),
-            ]
-        };
+        let mut lines: Vec<Line> = ascii_art.lines().map(|s| Line::from(s.to_string())).collect();
+
+        if battle_state.selected_button == *button_type {
+            for (i, line) in lines.iter_mut().enumerate() {
+                if i < heart_lines.len() {
+                    let heart_line_str = &heart_lines[i];
+                    let original_content = line.spans[0].content.to_string();
+
+                    // Take the part of the original content *after* the heart_line_str characters
+                    let remaining_content = original_content.chars().skip(heart_line_str.chars().count()).collect::<String>();
+
+                    // Create a new Line with the heart and the remaining content
+                    *line = Line::from(vec![
+                        Span::styled(heart_line_str.clone(), Style::default().fg(Color::Rgb(255, 0, 0))),
+                        Span::styled(remaining_content, style),
+                    ]);
+                } else {
+                    // If heart has fewer lines than button art, just clear the first 3 chars
+                    let original_content = line.spans[0].content.to_string();
+                    let remaining_content = original_content.chars().skip(3).collect::<String>();
+                    *line = Line::from(vec![
+                        Span::raw("   "),
+                        Span::styled(remaining_content, style),
+                    ]);
+                }
+            }
+        }
 
         let button_block = Block::default()
             .borders(Borders::ALL)
@@ -140,7 +158,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             .border_style(Style::default().fg(Color::Rgb(255, 165, 0)).bg(Color::Rgb(0, 0, 0))); // Orange border
 
         frame.render_widget(button_block, *area);
-        frame.render_widget(Paragraph::new(button_text), *area);
+        frame.render_widget(Paragraph::new(lines).style(style), *area);
     }
 
     // Main content box
@@ -248,7 +266,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             }
 
             // Draw gun if present
-            if let Some(gun_state) = &game_state.battle_state.as_ref().unwrap().gun_state {
+            if let Some(gun_state) = &battle_state.gun_state {
                 use crate::game::battle::GunState;
                 use crate::game::battle::GunDirection;
                 use ansi_to_tui::IntoText;
@@ -341,6 +359,7 @@ fn draw_game_over_transition(frame: &mut Frame, battle_state: &mut BattleState) 
 }
 
 fn draw_game_over(frame: &mut Frame) {
+    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), frame.area());
     let game_over_text = "GAME OVER";
     let p = Paragraph::new(game_over_text)
         .style(Style::default().fg(Color::Rgb(255, 255, 255)))
