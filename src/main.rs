@@ -31,6 +31,8 @@ fn run_app() -> io::Result<()> {
     game_state.player.is_walking = false;
     game_state.player.animation_frame = 0;
 
+    
+
     let result = game_loop::run(&mut terminal, &mut game_state);
 
     if let Err(e) = stdout().execute(PopKeyboardEnhancementFlags) {

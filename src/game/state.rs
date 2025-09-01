@@ -1,7 +1,8 @@
+use super::battle::BattleState;
 use super::deltarune::Deltarune;
+use super::face::FaceManager;
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
-use crate::game::map::PlacedSprite;
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
 use rand::thread_rng;
@@ -18,9 +19,7 @@ fn default_instant() -> Instant {
     Instant::now()
 }
 
-fn default_duration() -> Duration {
-    Duration::from_millis(50)
-}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TeleportCreationState {
     None,
@@ -82,6 +81,8 @@ pub struct GameState {
     pub flicker_count: u8,
     pub show_flicker_black_screen: bool,
     pub battle_page_active: bool,
+    #[serde(skip)]
+    pub battle_state: Option<BattleState>,
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -115,6 +116,8 @@ pub struct GameState {
     pub teleport_transition_timer: Option<Instant>,
     #[serde(skip)]
     pub pending_teleport_destination: Option<(u16, u16, i32, i32, String, u32)>,
+    #[serde(skip)]
+    pub face_manager: FaceManager,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -172,6 +175,7 @@ impl GameState {
             flicker_count: 10,
             show_flicker_black_screen: false,
             battle_page_active: false,
+            battle_state: None,
             sound_error: None,
             current_map_row,
             current_map_col,
@@ -193,6 +197,7 @@ impl GameState {
             teleport_state: TeleportState::None,
             teleport_transition_timer: None,
             pending_teleport_destination: None,
+            face_manager: FaceManager::new(),
         }
     }
 
@@ -206,28 +211,18 @@ impl GameState {
     }
 
     pub fn load_game_state() -> io::Result<Self> {
-        match std::fs::read_to_string("game_data.json") {
-            Ok(data) => {
-                let deserialized: SaveData = serde_json::from_str(&data)?;
-                let map = Map::load(&deserialized.current_map_name).map_err(|e| {
-                    io::Error::new(io::ErrorKind::Other, format!("Failed to load map: {}", e))
-                })?;
-                let game_state = GameState::from_map(map);
-                Ok(game_state)
-            }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                let map = Map::load("map_0_0").map_err(|e| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Failed to load default map: {}", e),
-                    )
-                })?;
-                let mut default_state = GameState::from_map(map);
-                default_state.save_game_state()?;
-                Ok(default_state)
-            }
-            Err(e) => Err(e),
-        }
+        // Always load map_0_0 for now as per user request
+        let map = Map::load("map_0_0").map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to load default map: {}", e),
+            )
+        })?;
+        let mut game_state = GameState::from_map(map.clone());
+        // Ensure player spawns at map_0_0's spawn point
+        game_state.player.x = map.player_spawn.0 as f32;
+        game_state.player.y = map.player_spawn.1 as f32;
+        Ok(game_state)
     }
 
     pub fn dismiss_message(&mut self) {
@@ -256,7 +251,8 @@ impl GameState {
 
                 if self.flicker_count == 0 {
                     self.is_flickering = false;
-                    self.battle_page_active = true; // Transition to "hey ya" page
+                    self.battle_page_active = true; // Transition to battle page
+                    self.battle_state = Some(BattleState::new()); // Create a new battle
                     self.show_flicker_black_screen = false; // Ensure not black when transitioning
                 }
             }
@@ -264,8 +260,11 @@ impl GameState {
             return;
         }
 
-        // If battle page is active, block other updates
+        // If battle page is active, run battle update
         if self.battle_page_active {
+            if let Some(battle_state) = &mut self.battle_state {
+                battle_state.update(delta_time, key_states, audio);
+            }
             return;
         }
 
@@ -320,7 +319,6 @@ impl GameState {
             history_index: &mut self.history_index,
             is_drawing_select_box: self.is_drawing_select_box,
             block_player_movement_on_message: &mut self.block_player_movement_on_message,
-            is_placing_sprite: self.is_placing_sprite,
         };
 
         let player_interaction_rect = self.player.get_interaction_rect();

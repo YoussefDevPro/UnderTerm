@@ -1,26 +1,248 @@
 use crate::debug;
-use crate::game::map::PlacedSprite;
+use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
-use ratatui::text::Text;
+use ratatui::text::{Line, Span, Text};
 
 use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, Borders, BorderType, Clear, Paragraph, Widget},
     Frame,
 };
+
+fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &GameState) {
+    let size = frame.area();
+    let background = Block::default().bg(Color::Black);
+    frame.render_widget(background, size);
+
+    // Main layout
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(60), // Enemy area
+            Constraint::Percentage(40), // Player area
+        ])
+        .split(size);
+
+    // Draw enemy
+    if !battle_state.enemy.sprite_frames.is_empty() {
+        let enemy_sprite = battle_state.enemy.sprite_frames[battle_state.enemy.current_frame].clone();
+        let enemy_text = enemy_sprite.as_bytes().into_text().unwrap();
+        let enemy_width = enemy_text.width() as u16;
+        let enemy_height = enemy_text.height() as u16;
+
+        // Clamp enemy dimensions to the available area
+        let enemy_draw_width = enemy_width.min(chunks[0].width);
+        let enemy_draw_height = enemy_height.min(chunks[0].height);
+
+        let enemy_x = chunks[0].x + (chunks[0].width.saturating_sub(enemy_draw_width)) / 2;
+        let enemy_y = chunks[0].y + (chunks[0].height.saturating_sub(enemy_draw_height)) / 2;
+
+        let enemy_area = ratatui::layout::Rect::new(enemy_x, enemy_y, enemy_draw_width, enemy_draw_height);
+        let enemy_paragraph = Paragraph::new(enemy_text);
+        frame.render_widget(enemy_paragraph, enemy_area);
+    }
+
+    // Player area layout
+    let player_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0), // Main box
+            Constraint::Length(5), // Buttons
+        ])
+        .split(chunks[1]);
+
+    let button_area = player_chunks[1];
+
+    let buttons_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ])
+        .split(button_area);
+
+    let buttons = [
+        (BattleButton::Fight, "FIGHT", buttons_layout[0]),
+        (BattleButton::Act, "ACT", buttons_layout[1]),
+        (BattleButton::Item, "ITEM", buttons_layout[2]),
+        (BattleButton::Mercy, "MERCY", buttons_layout[3]),
+    ];
+
+    if battle_state.mode != BattleMode::Defend {
+        for (button_type, text, area) in &buttons {
+            let mut style = Style::default().fg(Color::Rgb(255, 165, 0)); // Orange
+            if *button_type == BattleButton::Mercy {
+                style = Style::default().fg(Color::Gray);
+            }
+
+            let button_text = if battle_state.selected_button == *button_type {
+                vec![
+                    Line::from(""),
+                    Line::from(vec![ 
+                        Span::styled("❤ ", Style::default().fg(Color::Red)),
+                        Span::styled(*text, style),
+                    ]),
+                ]
+            } else {
+                vec![
+                    Line::from(""),
+                    Line::from(vec![ 
+                        Span::raw("  "),
+                        Span::styled(*text, style),
+                    ]),
+                ]
+            };
+
+            let button_block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Thick)
+                .border_style(Style::default().fg(Color::Rgb(255, 165, 0))); // Orange border
+
+            frame.render_widget(button_block, *area);
+            frame.render_widget(Paragraph::new(button_text), *area);
+        }
+    }
+
+    // Main content box
+    let box_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick);
+    let box_area = player_chunks[0];
+    frame.render_widget(box_block.clone(), box_area);
+
+    // Draw content inside the main box based on the mode
+    match battle_state.mode {
+        BattleMode::Menu => {
+            let message = Paragraph::new(battle_state.message.join("\n"))
+                .style(Style::default().fg(Color::White))
+                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
+            frame.render_widget(message, box_area);
+        }
+        BattleMode::Act => {
+            let mut act_lines = Vec::new();
+            for (i, option) in battle_state.act_options.iter().enumerate() {
+                if i == battle_state.selected_act_option {
+                    act_lines.push(Line::from(vec![ 
+                        Span::styled("❤ ", Style::default().fg(Color::Red)),
+                        Span::styled(format!("* {}", option), Style::default().fg(Color::White)),
+                    ]));
+                } else {
+                    act_lines.push(Line::from(vec![ 
+                        Span::raw("  "),
+                        Span::styled(format!("* {}", option), Style::default().fg(Color::White)),
+                    ]));
+                }
+            }
+            let act_list = Paragraph::new(act_lines)
+                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
+            frame.render_widget(act_list, box_area);
+        }
+        BattleMode::Item => {
+            let item_text = Paragraph::new("Item mode placeholder")
+                .style(Style::default().fg(Color::White))
+                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
+            frame.render_widget(item_text, box_area);
+        }
+        BattleMode::Attack => {
+            let slider_width = 50;
+            let slider_area = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(40),
+                    Constraint::Length(1),
+                    Constraint::Percentage(40),
+                ])
+                .split(box_area.inner(Margin { vertical: 0, horizontal: (box_area.width.saturating_sub(slider_width)) / 2 }))[1];
+
+            let slider_bar = "[".to_string() + &"=".repeat(slider_width as usize) + "]";
+            let slider_paragraph = Paragraph::new(slider_bar).style(Style::default().fg(Color::White));
+            frame.render_widget(slider_paragraph, slider_area);
+
+            let stick_position = (battle_state.attack_slider.position / 100.0 * slider_width as f32) as u16;
+            let stick_area = ratatui::layout::Rect::new(slider_area.x + stick_position, slider_area.y, 1, 1);
+            let stick = Paragraph::new("|").style(Style::default().fg(Color::Red));
+            frame.render_widget(stick, stick_area);
+        }
+        BattleMode::Defend => {
+            let board_width = (box_area.height.saturating_sub(2)) * 2;
+            let board_height = box_area.height.saturating_sub(2);
+            let board_x = box_area.x + (box_area.width.saturating_sub(board_width)) / 2;
+            let board_y = box_area.y + 1;
+
+            let bullet_board_area = ratatui::layout::Rect::new(board_x, board_y, board_width, board_height);
+            battle_state.bullet_board_size = (bullet_board_area.width, bullet_board_area.height);
+
+            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Black));
+            frame.render_widget(board_block, bullet_board_area);
+
+            let heart_sprite = "❤";
+            // Clamp heart position to be within the bullet board area to prevent panic
+            let heart_x_f = battle_state.player_heart.x.max(0.0).min(bullet_board_area.width as f32 - battle_state.player_heart.width as f32);
+            let heart_y_f = battle_state.player_heart.y.max(0.0).min(bullet_board_area.height as f32 - battle_state.player_heart.height as f32);
+            let heart_x = bullet_board_area.x + heart_x_f as u16;
+            let heart_y = bullet_board_area.y + heart_y_f as u16;
+
+            let heart_area = ratatui::layout::Rect::new(heart_x, heart_y, battle_state.player_heart.width, battle_state.player_heart.height);
+            let heart_paragraph = Paragraph::new(heart_sprite).style(Style::default().fg(Color::Red));
+            frame.render_widget(heart_paragraph, heart_area);
+        }
+        _ => { // For Narrative
+            if battle_state.mode == BattleMode::Narrative {
+                let face_width = battle_state.narrative_face.as_ref()
+                    .and_then(|name| game_state.face_manager.faces.get(name))
+                    .map_or(0, |face| face.width + 1); // +1 for spacing
+
+                let narrative_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(face_width),
+                        Constraint::Min(0),
+                    ])
+                    .split(box_area.inner(Margin { vertical: 1, horizontal: 1 }));
+
+                if face_width > 0 {
+                    if let Some(face_name) = &battle_state.narrative_face {
+                        if let Some(face) = game_state.face_manager.faces.get(face_name) {
+                            let face_text = face.content.as_bytes().into_text().unwrap();
+                            let face_paragraph = Paragraph::new(face_text);
+                            frame.render_widget(face_paragraph, narrative_chunks[0]);
+                        }
+                    }
+                }
+
+                let narrative_paragraph = Paragraph::new(battle_state.animated_narrative_content.clone())
+                    .wrap(ratatui::widgets::Wrap { trim: true })
+                    .style(Style::default().fg(Color::White));
+                frame.render_widget(narrative_paragraph, narrative_chunks[1]);
+            } else {
+                let text = Paragraph::new("...")
+                    .style(Style::default().fg(Color::White))
+                    .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
+                frame.render_widget(text, box_area);
+            }
+        }
+    }
+}
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
 
     if game_state.battle_page_active {
-        frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
-        let hey_ya_text = Paragraph::new("looks like, u reached an unfinished part")
-            .style(Style::default().fg(Color::White));
-        let hey_ya_area = ratatui::layout::Rect::new(size.width / 2 - 4, size.height / 2 - 1, 8, 2);
-        frame.render_widget(hey_ya_text, hey_ya_area);
+        let mut temp_battle_state = game_state.battle_state.take();
+        if let Some(battle_state) = &mut temp_battle_state {
+            draw_battle(frame, battle_state, game_state);
+        } else {
+            // This should not happen, but as a fallback
+            frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+            let text = Paragraph::new("Battle active, but no state found!")
+                .style(Style::default().fg(Color::Red));
+            frame.render_widget(text, size);
+        }
+        game_state.battle_state = temp_battle_state; // Put it back
         return;
     }
 
@@ -182,7 +404,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
         for y_temp in 0..final_render_rect.height {
             for x_temp in 0..final_render_rect.width {
-                let cell = temp_buffer.get(x_temp, y_temp);
+                let cell = &temp_buffer[(x_temp, y_temp)];
 
                 let screen_x = final_render_rect.x + x_temp;
                 let screen_y = final_render_rect.y + y_temp;
@@ -191,7 +413,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                     continue;
                 }
 
-                let frame_cell = frame.buffer_mut().get_mut(screen_x, screen_y);
+                let frame_cell = &mut frame.buffer_mut()[(screen_x, screen_y)];
 
                 frame_cell.set_symbol(cell.symbol());
                 frame_cell.set_fg(cell.fg);

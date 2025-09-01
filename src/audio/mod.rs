@@ -25,7 +25,7 @@ impl Audio {
     }
 
     pub fn play_text_sound(&self) {
-        let file = File::open("assets/sound/TEXT.mp3").unwrap();
+        let file = File::open("assets/sound/A.mp3").unwrap();
         let decoder = Decoder::new(BufReader::new(file)).unwrap();
         self.stream_handle
             .play_raw(decoder.convert_samples())
@@ -33,7 +33,6 @@ impl Audio {
     }
 
     pub fn play_enemy_encounter_sound(&self) {
-        println!("Attempting to play enemy encounter sound."); // Add this line
         let file = File::open("assets/sound/enemy_encounter.mp3").unwrap();
         let decoder = Decoder::new(BufReader::new(file)).unwrap();
         self.stream_handle

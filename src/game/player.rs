@@ -62,7 +62,6 @@ pub struct PlayerUpdateContext<'a> {
     pub history_index: &'a mut usize,
     pub is_drawing_select_box: bool,
     pub block_player_movement_on_message: &'a mut bool,
-    pub is_placing_sprite: bool,
 }
 
 impl Player {

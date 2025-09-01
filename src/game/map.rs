@@ -12,16 +12,7 @@ pub struct PlacedSprite {
     pub ansi_content: String,
 }
 
-impl PlacedSprite {
-    pub fn to_rect(&self) -> ratatui::layout::Rect {
-        ratatui::layout::Rect::new(
-            self.x as u16,
-            self.y as u16,
-            self.width as u16,
-            self.height as u16,
-        )
-    }
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleZone {

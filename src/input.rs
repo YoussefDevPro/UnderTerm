@@ -1,11 +1,111 @@
 use crate::debug;
-use std::{collections::HashMap, fs, io, sync::mpsc, time::Instant};
+use std::{collections::HashMap, io, sync::mpsc, time::Instant};
 
 
 use crossterm::event::{self, Event, KeyCode};
+use rand::Rng;
 use serde_json;
 
+use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
+
+fn handle_battle_input(battle_state: &mut BattleState, key_code: KeyCode, audio: &crate::audio::Audio) {
+    match battle_state.mode {
+        BattleMode::Menu => match key_code {
+            KeyCode::Left => {
+                battle_state.selected_button = battle_state.selected_button.prev();
+                audio.play_open_settings_sound();
+            }
+            KeyCode::Right => {
+                battle_state.selected_button = battle_state.selected_button.next();
+                audio.play_open_settings_sound();
+            }
+            KeyCode::Enter => match battle_state.selected_button {
+                BattleButton::Fight => battle_state.mode = BattleMode::Attack,
+                BattleButton::Act => battle_state.mode = BattleMode::Act,
+                BattleButton::Item => battle_state.mode = BattleMode::Item,
+                BattleButton::Mercy => { /* Do nothing */ }
+            },
+            _ => {}
+        },
+        BattleMode::Act => match key_code {
+            KeyCode::Up => {
+                if battle_state.selected_act_option > 0 {
+                    battle_state.selected_act_option -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if battle_state.selected_act_option < battle_state.act_options.len() - 1 {
+                    battle_state.selected_act_option += 1;
+                }
+            }
+            KeyCode::Enter => {
+                // Handle act selection
+                let selected_option = battle_state.act_options[battle_state.selected_act_option].clone();
+                battle_state.narrative_text = format!("* You chose to {}.", selected_option);
+                battle_state.narrative_face = Some("face_neutral".to_string()); // Use default face for now
+                battle_state.mode = BattleMode::Narrative;
+                battle_state.animated_narrative_content.clear();
+                battle_state.narrative_animation_finished = false;
+                battle_state.previous_chars_shown = 0;
+
+                // Random dialogue selection
+                let dialogues = vec![
+                    ("* Hello there! This is a random message.", Some("face_neutral".to_string())),
+                    ("* Are you ready for battle?", Some("face_determined".to_string())),
+                    ("* I hope you are enjoying the game.", Some("face_smile".to_string())),
+                    ("* This is another random dialogue.", Some("face_huh".to_string())),
+                    ("* What do you think about this?", Some("face_meh".to_string())),
+                    ("* The weather is nice today.", None), // No face
+                    ("* Hehehe...", Some("face_hehehe".to_string())),
+                    ("* A determined smile fills you with determination.", Some("face_determined_smile".to_string())),
+                    ("* ...", Some("face_sight".to_string())),
+                    ("* 3", Some("face_3".to_string())),
+                ];
+                let mut rng = rand::thread_rng();
+                let (text, face) = dialogues[rng.gen_range(0..dialogues.len())].clone();
+                battle_state.narrative_text = text.to_string();
+                battle_state.narrative_face = face;
+            }
+            KeyCode::Esc => {
+                battle_state.mode = BattleMode::Menu;
+            }
+            _ => {}
+        },
+        BattleMode::Attack => match key_code {
+            KeyCode::Enter => {
+                // Handle attack
+                battle_state.mode = BattleMode::Menu; // Go back to menu for now
+            }
+            KeyCode::Esc => {
+                battle_state.mode = BattleMode::Menu;
+            }
+            _ => {}
+        },
+        BattleMode::Narrative => {
+            if key_code == KeyCode::Enter {
+                if battle_state.narrative_animation_finished {
+                    // Advance to next message or mode
+                    battle_state.mode = BattleMode::Defend; // For now, go to defend
+                } else {
+                    // Skip animation
+                    battle_state.animated_narrative_content = battle_state.narrative_text.clone();
+                    battle_state.narrative_animation_finished = true;
+                }
+            } else if key_code == KeyCode::Esc {
+                // Skip animation without advancing
+                battle_state.animated_narrative_content = battle_state.narrative_text.clone();
+                battle_state.narrative_animation_finished = true;
+                battle_state.mode = BattleMode::Menu; // Go back to menu
+            }
+        }
+        _ => { // Placeholder for other modes
+            if key_code == KeyCode::Esc {
+                battle_state.mode = BattleMode::Menu;
+            }
+        }
+    }
+}
 
 pub fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
     loop {
@@ -27,6 +127,26 @@ pub fn process_events(
 ) -> io::Result<bool> {
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {
+            if game_state.battle_page_active {
+                match key.kind {
+                    event::KeyEventKind::Press => {
+                        key_states.insert(key.code, true);
+                    }
+                    event::KeyEventKind::Release => {
+                        key_states.insert(key.code, false);
+                    }
+                    _ => {}
+                }
+
+                if let Some(battle_state) = &mut game_state.battle_state {
+                    if key.kind == event::KeyEventKind::Press {
+                        handle_battle_input(battle_state, key.code, audio);
+                    }
+                }
+                // Don't process other inputs if in battle
+                continue;
+            }
+
             if game_state.is_text_input_active {
                 match key.code {
                     KeyCode::Char(c) => {
