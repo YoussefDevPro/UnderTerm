@@ -2,18 +2,21 @@ use crate::debug;
 use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
+use rand::Rng;
 use ratatui::text::{Line, Span, Text};
+
+use std::time::Duration;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, BorderType, Clear, Paragraph, Widget},
+    widgets::{Block, Borders, BorderType, Clear, Gauge, Paragraph, Widget},
     Frame,
 };
 
 fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &GameState) {
     let size = frame.area();
-    let background = Block::default().bg(Color::Black);
+    let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
 
     // Main layout
@@ -28,7 +31,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
     // Draw enemy
     if !battle_state.enemy.sprite_frames.is_empty() {
         let enemy_sprite = battle_state.enemy.sprite_frames[battle_state.enemy.current_frame].clone();
-        let enemy_text = enemy_sprite.as_bytes().into_text().unwrap();
+        let mut enemy_text = enemy_sprite.as_bytes().into_text().unwrap();
         let enemy_width = enemy_text.width() as u16;
         let enemy_height = enemy_text.height() as u16;
 
@@ -36,10 +39,19 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         let enemy_draw_width = enemy_width.min(chunks[0].width);
         let enemy_draw_height = enemy_height.min(chunks[0].height);
 
-        let enemy_x = chunks[0].x + (chunks[0].width.saturating_sub(enemy_draw_width)) / 2;
+        let mut enemy_x = (chunks[0].x + (chunks[0].width.saturating_sub(enemy_draw_width)) / 2) as i32;
         let enemy_y = chunks[0].y + (chunks[0].height.saturating_sub(enemy_draw_height)) / 2;
 
-        let enemy_area = ratatui::layout::Rect::new(enemy_x, enemy_y, enemy_draw_width, enemy_draw_height);
+        if battle_state.enemy.is_shaking {
+            enemy_x += rand::thread_rng().gen_range(-1..=1);
+        }
+
+        // Apply black foreground if in Defend mode
+        if battle_state.mode == BattleMode::Defend {
+            enemy_text = game_state.darken_text(enemy_text, 100); // 100 means completely black
+        }
+
+        let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
         let enemy_paragraph = Paragraph::new(enemy_text);
         frame.render_widget(enemy_paragraph, enemy_area);
     }
@@ -53,7 +65,27 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         ])
         .split(chunks[1]);
 
-    let button_area = player_chunks[1];
+    let bottom_area = player_chunks[1];
+
+    let bottom_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70), // Buttons
+            Constraint::Percentage(30), // HP
+        ])
+        .split(bottom_area);
+    
+    let button_area = bottom_chunks[0];
+    let hp_area = bottom_chunks[1];
+
+    // HP Gauge
+    let hp_label = format!("HP {} / {}", battle_state.player_hp, battle_state.player_max_hp);
+    let gauge = Gauge::default()
+        .block(Block::default().title("KR"))
+        .gauge_style(Style::default().fg(Color::Rgb(255, 255, 0)).bg(Color::Rgb(255, 0, 0)))
+        .label(hp_label)
+        .ratio((battle_state.player_hp as f64) / (battle_state.player_max_hp as f64));
+    frame.render_widget(gauge, hp_area);
 
     let buttons_layout = Layout::default()
         .direction(Direction::Horizontal)
@@ -72,39 +104,37 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         (BattleButton::Mercy, "MERCY", buttons_layout[3]),
     ];
 
-    if battle_state.mode != BattleMode::Defend {
-        for (button_type, text, area) in &buttons {
-            let mut style = Style::default().fg(Color::Rgb(255, 165, 0)); // Orange
-            if *button_type == BattleButton::Mercy {
-                style = Style::default().fg(Color::Gray);
-            }
-
-            let button_text = if battle_state.selected_button == *button_type {
-                vec![
-                    Line::from(""),
-                    Line::from(vec![ 
-                        Span::styled("❤ ", Style::default().fg(Color::Red)),
-                        Span::styled(*text, style),
-                    ]),
-                ]
-            } else {
-                vec![
-                    Line::from(""),
-                    Line::from(vec![ 
-                        Span::raw("  "),
-                        Span::styled(*text, style),
-                    ]),
-                ]
-            };
-
-            let button_block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Thick)
-                .border_style(Style::default().fg(Color::Rgb(255, 165, 0))); // Orange border
-
-            frame.render_widget(button_block, *area);
-            frame.render_widget(Paragraph::new(button_text), *area);
+    for (button_type, text, area) in &buttons {
+        let mut style = Style::default().fg(Color::Rgb(255, 165, 0)); // Orange
+        if *button_type == BattleButton::Mercy {
+            style = Style::default().fg(Color::Rgb(128, 128, 128));
         }
+
+        let button_text = if battle_state.selected_button == *button_type {
+            vec![
+                Line::from(""),
+                Line::from(vec![ 
+                    Span::styled("❤ ", Style::default().fg(Color::Rgb(255, 0, 0))),
+                    Span::styled(*text, style),
+                ]),
+            ]
+        } else {
+            vec![
+                Line::from(""),
+                Line::from(vec![ 
+                    Span::raw("  "),
+                    Span::styled(*text, style),
+                ]),
+            ]
+        };
+
+        let button_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Thick)
+            .border_style(Style::default().fg(Color::Rgb(255, 165, 0))); // Orange border
+
+        frame.render_widget(button_block, *area);
+        frame.render_widget(Paragraph::new(button_text), *area);
     }
 
     // Main content box
@@ -118,7 +148,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
     match battle_state.mode {
         BattleMode::Menu => {
             let message = Paragraph::new(battle_state.message.join("\n"))
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(Color::Rgb(255, 255, 255)))
                 .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
             frame.render_widget(message, box_area);
         }
@@ -127,13 +157,13 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             for (i, option) in battle_state.act_options.iter().enumerate() {
                 if i == battle_state.selected_act_option {
                     act_lines.push(Line::from(vec![ 
-                        Span::styled("❤ ", Style::default().fg(Color::Red)),
-                        Span::styled(format!("* {}", option), Style::default().fg(Color::White)),
+                        Span::styled("❤ ", Style::default().fg(Color::Rgb(255, 0, 0))),
+                        Span::styled(format!("* {}", option), Style::default().fg(Color::Rgb(255, 255, 255))),
                     ]));
                 } else {
                     act_lines.push(Line::from(vec![ 
                         Span::raw("  "),
-                        Span::styled(format!("* {}", option), Style::default().fg(Color::White)),
+                        Span::styled(format!("* {}", option), Style::default().fg(Color::Rgb(255, 255, 255))),
                     ]));
                 }
             }
@@ -143,7 +173,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         }
         BattleMode::Item => {
             let item_text = Paragraph::new("Item mode placeholder")
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(Color::Rgb(255, 255, 255)))
                 .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
             frame.render_widget(item_text, box_area);
         }
@@ -159,39 +189,62 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
                 .split(box_area.inner(Margin { vertical: 0, horizontal: (box_area.width.saturating_sub(slider_width)) / 2 }))[1];
 
             let slider_bar = "[".to_string() + &"=".repeat(slider_width as usize) + "]";
-            let slider_paragraph = Paragraph::new(slider_bar).style(Style::default().fg(Color::White));
+            let slider_paragraph = Paragraph::new(slider_bar).style(Style::default().fg(Color::Rgb(255, 255, 255)));
             frame.render_widget(slider_paragraph, slider_area);
+
+            let red_center_width = slider_width / 10;
+            let red_center_start = slider_area.x + (slider_width / 2) - (red_center_width / 2);
+            let red_center_area = ratatui::layout::Rect::new(red_center_start, slider_area.y, red_center_width, 1);
+            let red_center_paragraph = Paragraph::new("=".repeat(red_center_width as usize)).style(Style::default().fg(Color::Rgb(255, 0, 0)));
+            frame.render_widget(red_center_paragraph, red_center_area);
 
             let stick_position = (battle_state.attack_slider.position / 100.0 * slider_width as f32) as u16;
             let stick_area = ratatui::layout::Rect::new(slider_area.x + stick_position, slider_area.y, 1, 1);
-            let stick = Paragraph::new("|").style(Style::default().fg(Color::Red));
+            let stick = Paragraph::new("|").style(Style::default().fg(Color::Rgb(255, 255, 0)));
             frame.render_widget(stick, stick_area);
         }
         BattleMode::Defend => {
-            let board_width = (box_area.height.saturating_sub(2)) * 2;
-            let board_height = box_area.height.saturating_sub(2);
-            let board_x = box_area.x + (box_area.width.saturating_sub(board_width)) / 2;
-            let board_y = box_area.y + 1;
+            // The bullet board is a large, centered rectangle
+            let board_area = ratatui::layout::Rect {
+                x: size.width / 4,
+                y: size.height / 4,
+                width: size.width / 2,
+                height: size.height / 2,
+            };
+            battle_state.bullet_board_size = (board_area.width, board_area.height);
 
-            let bullet_board_area = ratatui::layout::Rect::new(board_x, board_y, board_width, board_height);
-            battle_state.bullet_board_size = (bullet_board_area.width, bullet_board_area.height);
+            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Rgb(0, 0, 0)));
+            frame.render_widget(board_block, board_area);
 
-            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Black));
-            frame.render_widget(board_block, bullet_board_area);
-
-            let heart_sprite = "❤";
+            let heart_sprite = "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ";
             // Clamp heart position to be within the bullet board area to prevent panic
-            let heart_x_f = battle_state.player_heart.x.max(0.0).min(bullet_board_area.width as f32 - battle_state.player_heart.width as f32);
-            let heart_y_f = battle_state.player_heart.y.max(0.0).min(bullet_board_area.height as f32 - battle_state.player_heart.height as f32);
-            let heart_x = bullet_board_area.x + heart_x_f as u16;
-            let heart_y = bullet_board_area.y + heart_y_f as u16;
+            let heart_x_f = battle_state.player_heart.x.max(0.0).min(board_area.width as f32 - battle_state.player_heart.width as f32);
+            let heart_y_f = battle_state.player_heart.y.max(0.0).min(board_area.height as f32 - battle_state.player_heart.height as f32);
+            let heart_x = board_area.x + heart_x_f as u16;
+            let heart_y = board_area.y + heart_y_f as u16;
 
             let heart_area = ratatui::layout::Rect::new(heart_x, heart_y, battle_state.player_heart.width, battle_state.player_heart.height);
-            let heart_paragraph = Paragraph::new(heart_sprite).style(Style::default().fg(Color::Red));
+            let heart_paragraph = Paragraph::new(heart_sprite).style(Style::default().fg(Color::Rgb(255, 0, 0)));
             frame.render_widget(heart_paragraph, heart_area);
+
+            // Draw bullets
+            for bullet in &battle_state.bullets {
+                let bullet_x = board_area.x + bullet.x as u16;
+                let bullet_y = board_area.y + bullet.y as u16;
+                if bullet_x < board_area.right() && bullet_y < board_area.bottom() {
+                    let bullet_p = Paragraph::new(bullet.symbol.clone()).style(Style::default().fg(Color::Rgb(255, 255, 255)));
+                    frame.render_widget(bullet_p, ratatui::layout::Rect::new(bullet_x, bullet_y, bullet.width, bullet.height));
+                }
+            }
+        }
+        BattleMode::GameOverTransition => {
+            draw_game_over_transition(frame, battle_state);
+        }
+        BattleMode::GameOver => {
+            draw_game_over(frame);
         }
         _ => { // For Narrative
-            if battle_state.mode == BattleMode::Narrative {
+            if battle_state.mode == BattleMode::Narrative || battle_state.mode == BattleMode::OpeningNarrative {
                 let face_width = battle_state.narrative_face.as_ref()
                     .and_then(|name| game_state.face_manager.faces.get(name))
                     .map_or(0, |face| face.width + 1); // +1 for spacing
@@ -216,16 +269,51 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
 
                 let narrative_paragraph = Paragraph::new(battle_state.animated_narrative_content.clone())
                     .wrap(ratatui::widgets::Wrap { trim: true })
-                    .style(Style::default().fg(Color::White));
+                    .style(Style::default().fg(Color::Rgb(255, 255, 255)));
                 frame.render_widget(narrative_paragraph, narrative_chunks[1]);
             } else {
                 let text = Paragraph::new("...")
-                    .style(Style::default().fg(Color::White))
+                    .style(Style::default().fg(Color::Rgb(255, 255, 255)))
                     .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
                 frame.render_widget(text, box_area);
             }
         }
     }
+}
+
+fn draw_game_over_transition(frame: &mut Frame, battle_state: &mut BattleState) {
+    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), frame.area());
+    let elapsed = battle_state.game_over_timer.elapsed();
+
+    let heart_sprite = if elapsed < Duration::from_secs(1) {
+        "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ".to_string()
+    } else {
+        "       \n■█ ▄█■\n ▀█ █▀ \n  ▀ ▀  ".to_string()
+    };
+
+    let heart_paragraph = Paragraph::new(heart_sprite)
+        .style(Style::default().fg(Color::Rgb(255, 0, 0)))
+        .alignment(ratatui::layout::Alignment::Center);
+    
+    frame.render_widget(heart_paragraph, frame.area());
+}
+
+fn draw_game_over(frame: &mut Frame) {
+    let game_over_text = "GAME OVER";
+    let p = Paragraph::new(game_over_text)
+        .style(Style::default().fg(Color::Rgb(255, 255, 255)))
+        .alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(p, frame.area());
+
+    // Add replay button
+    let replay_text = "Press Enter to Replay";
+    let replay_p = Paragraph::new(replay_text)
+        .style(Style::default().fg(Color::Rgb(255, 255, 255)))
+        .alignment(ratatui::layout::Alignment::Center);
+
+    let area = frame.area();
+    let replay_area = ratatui::layout::Rect::new(area.x, area.y + area.height / 2 + 2, area.width, 1);
+    frame.render_widget(replay_p, replay_area);
 }
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
@@ -239,10 +327,13 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             // This should not happen, but as a fallback
             frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
             let text = Paragraph::new("Battle active, but no state found!")
-                .style(Style::default().fg(Color::Red));
+                .style(Style::default().fg(Color::Rgb(255, 0, 0)));
             frame.render_widget(text, size);
         }
         game_state.battle_state = temp_battle_state; // Put it back
+        return;
+    } else if game_state.game_over_active {
+        draw_game_over(frame);
         return;
     }
 
@@ -302,7 +393,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                 let select_box_paragraph = Paragraph::new("").block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Green)),
+                        .border_style(Style::default().fg(Color::Rgb(0, 255, 0))),
                 );
                 frame.render_widget(select_box_paragraph, clamped_rect);
             }
@@ -448,7 +539,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             let draw_rect = ratatui::layout::Rect::new(draw_x, draw_y, width, height);
             let drawing_block = Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow));
+                .border_style(Style::default().fg(Color::Rgb(255, 255, 0)));
             frame.render_widget(drawing_block, draw_rect);
         }
     }
@@ -461,7 +552,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                 let draw_y = (y as u16).saturating_sub(game_state.camera_y);
 
                 if draw_x < size.width && draw_y < size.height {
-                    let wall_paragraph = Paragraph::new("W").style(Style::default().fg(Color::Red));
+                    let wall_paragraph = Paragraph::new("W").style(Style::default().fg(Color::Rgb(255, 0, 0)));
                     let wall_rect = ratatui::layout::Rect::new(draw_x, draw_y, 1, 1);
                     frame.render_widget(wall_paragraph, wall_rect);
                 }
@@ -473,13 +564,13 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let message_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White).bg(Color::White))
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .padding(ratatui::widgets::Padding::new(8, 8, 1, 1))
             .title("Message");
 
         let message_paragraph = Paragraph::new(game_state.animated_message_content.clone())
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .block(message_block);
 
         let message_height = 10;
@@ -519,13 +610,13 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White).bg(Color::White))
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title(title);
 
         let input_paragraph = Paragraph::new(game_state.text_input_buffer.clone())
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .block(input_block);
 
         let input_area_height = 3;
@@ -557,13 +648,13 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White).bg(Color::White))
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title("Enter Event");
 
         let input_paragraph = Paragraph::new(game_state.text_input_buffer.clone())
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .block(input_block);
 
         let input_area_height = 3;
@@ -595,8 +686,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White).bg(Color::White))
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title("Select Map Kind");
 
@@ -608,7 +699,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .unwrap_or_else(|| "Unknown or deltarune".to_string());
 
         let input_paragraph = Paragraph::new(format!("Current: {}", current_map_kind))
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
             .block(input_block);
 
         let input_area_height = 5;
@@ -665,7 +756,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let text_height = 3;
 
         let paragraph = Paragraph::new(combined_text)
-            .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)));
+            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
 
         let x = (size.width.saturating_sub(text_width)) / 2;
         let y = (size.height.saturating_sub(text_height)) / 2;

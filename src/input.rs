@@ -74,14 +74,37 @@ fn handle_battle_input(battle_state: &mut BattleState, key_code: KeyCode, audio:
         },
         BattleMode::Attack => match key_code {
             KeyCode::Enter => {
-                // Handle attack
-                battle_state.mode = BattleMode::Menu; // Go back to menu for now
+                let position = battle_state.attack_slider.position;
+                let distance_from_center = (position - 50.0).abs();
+                // Max damage 10, decreases with distance.
+                let damage = (10.0 - distance_from_center / 5.0).max(0.0).round() as i32;
+                
+                battle_state.enemy.hp -= damage;
+                battle_state.enemy.is_shaking = true;
+                battle_state.enemy.shake_timer = Instant::now();
+
+                battle_state.narrative_text = format!("* You did {} damage!", damage);
+                battle_state.narrative_face = None;
+                battle_state.mode = BattleMode::Narrative;
+                battle_state.animated_narrative_content.clear();
+                battle_state.narrative_animation_finished = false;
+                battle_state.previous_chars_shown = 0;
             }
             KeyCode::Esc => {
                 battle_state.mode = BattleMode::Menu;
             }
             _ => {}
         },
+        BattleMode::OpeningNarrative => {
+            if key_code == KeyCode::Enter {
+                if battle_state.narrative_animation_finished {
+                    battle_state.mode = BattleMode::Menu;
+                } else {
+                    battle_state.animated_narrative_content = battle_state.narrative_text.clone();
+                    battle_state.narrative_animation_finished = true;
+                }
+            }
+        }
         BattleMode::Narrative => {
             if key_code == KeyCode::Enter {
                 if battle_state.narrative_animation_finished {
@@ -145,6 +168,14 @@ pub fn process_events(
                 }
                 // Don't process other inputs if in battle
                 continue;
+            } else if game_state.game_over_active {
+                if key.code == KeyCode::Enter {
+                    // Reset game state
+                    *game_state = GameState::load_game_state()?; // This will reload map_0_0
+                    game_state.game_over_active = false;
+                    game_state.battle_page_active = false; // Ensure it's not active
+                }
+                continue; // Consume event
             }
 
             if game_state.is_text_input_active {

@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self};
 use std::time::{Duration, Instant};
+use crate::game::battle::BattleMode;
 
 fn default_instant() -> Instant {
     Instant::now()
@@ -118,6 +119,7 @@ pub struct GameState {
     pub pending_teleport_destination: Option<(u16, u16, i32, i32, String, u32)>,
     #[serde(skip)]
     pub face_manager: FaceManager,
+    pub game_over_active: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -198,6 +200,7 @@ impl GameState {
             teleport_transition_timer: None,
             pending_teleport_destination: None,
             face_manager: FaceManager::new(),
+            game_over_active: false,
         }
     }
 
@@ -264,6 +267,10 @@ impl GameState {
         if self.battle_page_active {
             if let Some(battle_state) = &mut self.battle_state {
                 battle_state.update(delta_time, key_states, audio);
+                if battle_state.mode == BattleMode::GameOver {
+                    self.game_over_active = true;
+                    self.battle_page_active = false;
+                }
             }
             return;
         }

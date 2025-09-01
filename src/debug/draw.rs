@@ -32,7 +32,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                     let clamped_rect = draw_rect.intersection(size);
                     if !clamped_rect.is_empty() {
                         let wall_paragraph = Paragraph::new("W")
-                            .style(Style::default().fg(Color::Red).bg(Color::Black));
+                            .style(Style::default().fg(Color::Rgb(255, 0, 0)).bg(Color::Rgb(0, 0, 0)));
                         frame.render_widget(wall_paragraph, clamped_rect);
                     }
                 }
@@ -52,7 +52,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         let clamped_rect = draw_rect.intersection(size);
         if !clamped_rect.is_empty() {
             let spawn_paragraph =
-                Paragraph::new("S").style(Style::default().fg(Color::Green).bg(Color::Black));
+                Paragraph::new("S").style(Style::default().fg(Color::Rgb(0, 255, 0)).bg(Color::Rgb(0, 0, 0)));
             frame.render_widget(spawn_paragraph, clamped_rect);
         }
     }
@@ -81,7 +81,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
         let collision_box_paragraph = Paragraph::new("").block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Blue)),
+                .border_style(Style::default().fg(Color::Rgb(0, 0, 255))),
         );
         frame.render_widget(collision_box_paragraph, clamped_rect);
     }
@@ -135,7 +135,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
             let box_paragraph = Paragraph::new("").block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Yellow)),
+                    .border_style(Style::default().fg(Color::Rgb(255, 255, 0))),
             );
             frame.render_widget(box_paragraph, clamped_rect);
         }
@@ -160,7 +160,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                 let select_box_paragraph = Paragraph::new("I").block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Cyan)),
+                        .border_style(Style::default().fg(Color::Rgb(0, 255, 255))),
                 );
                 frame.render_widget(select_box_paragraph, clamped_rect);
             }
@@ -184,7 +184,7 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
                 let battle_zone_paragraph = Paragraph::new("B").block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Magenta)),
+                        .border_style(Style::default().fg(Color::Rgb(255, 0, 255))),
                 );
                 frame.render_widget(battle_zone_paragraph, clamped_rect);
             }
@@ -213,9 +213,9 @@ pub fn draw_debug_info(frame: &mut Frame, game_state: &GameState) {
             if !clamped_rect.is_empty() {
                 let color =
                     if game_state.teleport_creation_state == TeleportCreationState::DrawingBox {
-                        Color::Magenta
+                        Color::Rgb(255, 0, 255)
                     } else {
-                        Color::Green
+                        Color::Rgb(0, 255, 0)
                     };
                 let pending_box_paragraph = Paragraph::new("").block(
                     Block::default()
@@ -274,13 +274,13 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
     let debug_block = Block::default()
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Thick)
-        .border_style(Style::default().fg(Color::White).bg(Color::White))
-        .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+        .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
+        .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
         .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
         .title("Debug Panel");
 
     let debug_paragraph = Paragraph::new(debug_text.join("\n"))
-        .style(Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)))
+        .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
         .block(debug_block);
 
     let max_line_length = debug_text.iter().map(|s| s.len() as u16).max().unwrap_or(0);

@@ -11,12 +11,15 @@ fn default_instant() -> Instant {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BattleMode {
+    OpeningNarrative,
     Menu,
     Act,
     Item,
     Attack,
     Defend,
     Narrative,
+    GameOverTransition,
+    GameOver,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -56,6 +59,17 @@ pub struct PlayerHeart {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Bullet {
+    pub x: f32,
+    pub y: f32,
+    pub vx: f32, // velocity x
+    pub vy: f32, // velocity y
+    pub width: u16,
+    pub height: u16,
+    pub symbol: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttackSlider {
     pub position: f32,
     pub speed: f32,
@@ -71,6 +85,7 @@ pub enum AttackType {
 pub struct Attack {
     pub attack_type: AttackType,
     pub duration: Duration,
+    pub damage: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +98,10 @@ pub struct Enemy {
     #[serde(skip, default = "default_instant")]
     pub last_frame_time: Instant,
     pub attacks: Vec<Attack>,
+    #[serde(skip, default = "default_instant")]
+    pub shake_timer: Instant,
+    #[serde(skip)]
+    pub is_shaking: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +109,8 @@ pub struct BattleState {
     pub mode: BattleMode,
     pub selected_button: BattleButton,
     pub enemy: Enemy,
+    pub player_hp: i32,
+    pub player_max_hp: i32,
     pub player_heart: PlayerHeart,
     pub attack_slider: AttackSlider,
     pub act_options: Vec<String>,
@@ -106,10 +127,13 @@ pub struct BattleState {
     pub narrative_animation_finished: bool,
     #[serde(skip)]
     pub previous_chars_shown: usize,
+    pub bullets: Vec<Bullet>,
     pub bullet_board_size: (u16, u16),
     pub current_attack: Option<Attack>,
     #[serde(skip, default = "default_instant")]
     pub attack_timer: Instant,
+    #[serde(skip, default = "default_instant")]
+    pub game_over_timer: Instant,
 }
 
 impl BattleState {
@@ -130,18 +154,25 @@ impl BattleState {
             attacks: vec![Attack {
                 attack_type: AttackType::Simple,
                 duration: Duration::from_secs(5),
+                damage: 2,
             }],
+            shake_timer: Instant::now(),
+            is_shaking: false,
         };
 
+        let opening_dialogue = "* Placeholder enemy appears.".to_string();
+
         BattleState {
-            mode: BattleMode::Menu,
+            mode: BattleMode::OpeningNarrative,
             selected_button: BattleButton::Fight,
             enemy,
+            player_hp: 20,
+            player_max_hp: 20,
             player_heart: PlayerHeart {
                 x: 50.0,
                 y: 50.0,
-                width: 3,
-                height: 2,
+                width: 7,
+                height: 4,
             },
             attack_slider: AttackSlider {
                 position: 0.0,
@@ -150,17 +181,19 @@ impl BattleState {
             },
             act_options: vec!["Check".to_string(), "Talk".to_string()],
             selected_act_option: 0,
-            message: vec!["* Placeholder enemy appears.".to_string()],
-            narrative_text: String::new(), // Will be set by random dialogue
-            narrative_face: None, // Will be set by random dialogue
+            message: vec![opening_dialogue.clone()],
+            narrative_text: opening_dialogue,
+            narrative_face: None, // No face for opening dialogue, or choose one
             animated_narrative_content: String::new(),
             narrative_animation_start_time: Instant::now(),
             narrative_animation_interval: Duration::from_millis(50),
             narrative_animation_finished: false,
             previous_chars_shown: 0,
+            bullets: Vec::new(),
             bullet_board_size: (100, 100), // Default size, will be updated by UI
             current_attack: None,
             attack_timer: Instant::now(),
+            game_over_timer: Instant::now(),
         }
     }
 
@@ -171,8 +204,14 @@ impl BattleState {
             self.enemy.last_frame_time = Instant::now();
         }
 
+        if self.enemy.is_shaking {
+            if self.enemy.shake_timer.elapsed() > Duration::from_millis(200) {
+                self.enemy.is_shaking = false;
+            }
+        }
+
         // Animate narrative text
-        if self.mode == BattleMode::Narrative && !self.narrative_animation_finished {
+        if (self.mode == BattleMode::Narrative || self.mode == BattleMode::OpeningNarrative) && !self.narrative_animation_finished {
             if self.narrative_animation_start_time.elapsed() >= self.narrative_animation_interval {
                 let current_len = self.animated_narrative_content.chars().count();
                 if current_len < self.narrative_text.chars().count() {
@@ -216,6 +255,7 @@ impl BattleState {
                 if self.current_attack.is_none() {
                     self.current_attack = Some(self.enemy.attacks[0].clone());
                     self.attack_timer = Instant::now();
+                    self.bullets.clear(); // Clear bullets from previous attack
                 }
 
                 if let Some(attack) = &self.current_attack {
@@ -223,11 +263,32 @@ impl BattleState {
                         self.current_attack = None;
                         self.mode = BattleMode::Menu; // Go back to menu after attack
                     } else {
-                        // Execute attack logic here
+                        // Spawn bullets based on attack pattern
+                        if rand::thread_rng().gen_bool(0.1) { // spawn randomly
+                            let bullet = Bullet {
+                                x: rand::thread_rng().gen_range(0.0..self.bullet_board_size.0 as f32),
+                                y: 0.0,
+                                vx: 0.0,
+                                vy: 50.0, // speed
+                                width: 1,
+                                height: 1,
+                                symbol: "■".to_string(),
+                            };
+                            self.bullets.push(bullet);
+                        }
                     }
                 }
 
-                let speed = 100.0;
+                // Update bullet positions
+                for bullet in &mut self.bullets {
+                    bullet.x += bullet.vx * delta_time.as_secs_f32();
+                    bullet.y += bullet.vy * delta_time.as_secs_f32();
+                }
+
+                // Remove bullets that are off-screen
+                self.bullets.retain(|b| b.y < self.bullet_board_size.1 as f32);
+
+                let speed = 200.0;
                 if *key_states.get(&KeyCode::Up).unwrap_or(&false) {
                     self.player_heart.y -= speed * delta_time.as_secs_f32();
                 }
@@ -241,6 +302,29 @@ impl BattleState {
                     self.player_heart.x += speed * delta_time.as_secs_f32();
                 }
 
+                // Collision detection
+                let heart_rect = ratatui::layout::Rect::new(
+                    self.player_heart.x as u16,
+                    self.player_heart.y as u16,
+                    self.player_heart.width,
+                    self.player_heart.height,
+                );
+                let damage = self.current_attack.as_ref().map_or(0, |a| a.damage);
+                self.bullets.retain(|bullet| {
+                    let bullet_rect = ratatui::layout::Rect::new(
+                        bullet.x as u16,
+                        bullet.y as u16,
+                        bullet.width,
+                        bullet.height,
+                    );
+                    if heart_rect.intersects(bullet_rect) {
+                        self.player_hp -= damage;
+                        false // remove bullet on collision
+                    } else {
+                        true
+                    }
+                });
+
                 // Clamp heart position to bullet board
                 self.player_heart.x = self
                     .player_heart
@@ -252,6 +336,16 @@ impl BattleState {
                     .y
                     .max(0.0)
                     .min(self.bullet_board_size.1 as f32 - self.player_heart.height as f32);
+
+                if self.player_hp <= 0 {
+                    self.mode = BattleMode::GameOverTransition;
+                    self.game_over_timer = Instant::now();
+                }
+            }
+            BattleMode::GameOverTransition => {
+                if self.game_over_timer.elapsed() > Duration::from_secs(2) {
+                    self.mode = BattleMode::GameOver;
+                }
             }
             _ => {}
         }
