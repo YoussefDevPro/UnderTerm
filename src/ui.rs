@@ -12,8 +12,9 @@ const MERCY_ASCII: &str = "▀▄ ▄▀  █▀▄▀█ █▀█ █▀█ �
 const ACT_ASCII: &str = "  ▄            \n▄  █ ▄▀█ █▀ ▀█▀\n █ █ █▀█ █▄  █ \n▀  █           \n  ▀            ";
 const ITEM_ASCII: &str = " ▀▀▀  ▀ ▀█▀ █▀█ █▀▄▀█\n■███■ █  █  █▄▄ █ ▀ █\n  ▀                  ";
 const SELECTED_HEART_ASCII: &str = " ▄ ▄ \n■█▄█■\n ▀█▀ ";
+const SELECTED_HEART_ASCII_WIDTH: usize = 5;
 
-use ratatui::{
+use ratatui::{ 
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, BorderType, Clear, Gauge, Paragraph, Widget},
@@ -24,6 +25,14 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
     let size = frame.area();
     let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
+
+    let fight_height = FIGHT_ASCII.lines().count() as u16;
+    let mercy_height = MERCY_ASCII.lines().count() as u16;
+    let act_height = ACT_ASCII.lines().count() as u16;
+    let item_height = ITEM_ASCII.lines().count() as u16;
+
+    let max_button_content_height = fight_height.max(mercy_height).max(act_height).max(item_height);
+    let button_area_height = max_button_content_height + 2; // +2 for top and bottom borders
 
     // Main layout
     let chunks = Layout::default()
@@ -73,7 +82,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0), // Main box
-            Constraint::Length(5), // Buttons
+            Constraint::Length(button_area_height), // Buttons
         ])
         .split(chunks[1]);
 
@@ -124,7 +133,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             style = Style::default().fg(Color::Rgb(128, 128, 128));
         }
 
-        let mut lines: Vec<Line> = ascii_art.lines().map(|s| Line::from(s.to_string())).collect();
+        let mut lines: Vec<Line> = ascii_art.lines().map(|s| Line::from(s.trim_end().to_string())).collect();
 
         if battle_state.selected_button == *button_type {
             for (i, line) in lines.iter_mut().enumerate() {
@@ -138,15 +147,15 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
                     // Create a new Line with the heart and the remaining content
                     *line = Line::from(vec![
                         Span::styled(heart_line_str.clone(), Style::default().fg(Color::Rgb(255, 0, 0))),
-                        Span::styled(remaining_content, style),
+                        Span::styled(remaining_content.trim_end().to_string(), style),
                     ]);
                 } else {
-                    // If heart has fewer lines than button art, just clear the first 3 chars
+                    // If heart has fewer lines than button art, just clear the first SELECTED_HEART_ASCII_WIDTH chars
                     let original_content = line.spans[0].content.to_string();
-                    let remaining_content = original_content.chars().skip(3).collect::<String>();
+                    let remaining_content = original_content.chars().skip(SELECTED_HEART_ASCII_WIDTH).collect::<String>();
                     *line = Line::from(vec![
-                        Span::raw("   "),
-                        Span::styled(remaining_content, style),
+                        Span::raw(" ".repeat(SELECTED_HEART_ASCII_WIDTH)),
+                        Span::styled(remaining_content.trim_end().to_string(), style),
                     ]);
                 }
             }
@@ -158,7 +167,7 @@ fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &G
             .border_style(Style::default().fg(Color::Rgb(255, 165, 0)).bg(Color::Rgb(0, 0, 0))); // Orange border
 
         frame.render_widget(button_block, *area);
-        frame.render_widget(Paragraph::new(lines).style(style), *area);
+        frame.render_widget(Paragraph::new(lines).style(style).alignment(ratatui::layout::Alignment::Center), *area);
     }
 
     // Main content box
