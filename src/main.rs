@@ -1,4 +1,5 @@
-use std::io::{self, stdout};
+use std::io::{self, stdout, IsTerminal};
+use under_term::{game, game_loop};
 
 use crossterm::{
     event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
@@ -6,9 +7,6 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use UnderTerm::*;
-
-use UnderTerm::game;
 
 fn run_app() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
@@ -38,6 +36,10 @@ fn run_app() -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
+    if !stdout().is_terminal() {
+        eprintln!("This application must be run in a terminal.");
+        return Ok(());
+    }
     let result = run_app();
     if let Err(e) = result {
         eprintln!("Error: {:?}", e);

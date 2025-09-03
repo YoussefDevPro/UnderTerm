@@ -47,19 +47,22 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let size = frame.area();
         frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
-        // Draw dialogue box
-        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 8; // Minimum height for the dialogue box
-        let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
+        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 8;
+        let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT);
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 10,
-            size.height.saturating_sub(dialogue_box_height + 2), // Position at bottom with some padding
+            size.height.saturating_sub(dialogue_box_height + 2),
             size.width - 20,
             dialogue_box_height,
         );
         let dialogue_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White).bg(Color::White)) // White border
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(255, 255, 255)),
+            )
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
@@ -78,12 +81,10 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), chunks[0]);
 
-        // Draw animated text
         let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
             .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(text_paragraph, chunks[1]);
 
-        // Draw enemy
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
         let enemy_height = enemy_text.lines.len() as u16;

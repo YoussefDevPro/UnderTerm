@@ -1,4 +1,4 @@
-use std::io::{self, stdout};
+use std::io::{stdout, IsTerminal};
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -13,8 +13,9 @@ use ratatui::{
 };
 use std::fs;
 use std::path::Path;
-use UnderTerm::game::dialogue::{Dialogue, DialogueManager};
+use under_term::game::dialogue::{Dialogue, DialogueManager};
 use serde_json;
+use std::io;
 
 enum EditorState {
     SelectFace,
@@ -77,7 +78,7 @@ impl Editor {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .split(f.size());
+                .split(f.area());
 
             match self.state {
                 EditorState::SelectFace => {
@@ -101,7 +102,7 @@ impl Editor {
                 EditorState::EnterText => {
                     let paragraph = Paragraph::new(self.text.as_str())
                         .block(Block::default().title("Enter Text (Press Enter when done)").borders(Borders::ALL));
-                    f.render_widget(paragraph, f.size());
+                    f.render_widget(paragraph, f.area());
                 }
                 EditorState::SelectEnemy => {
                     let items: Vec<ListItem> = self
@@ -125,7 +126,7 @@ impl Editor {
                     let text = "Press Enter to save and create another dialogue, or X to save and exit.";
                     let paragraph = Paragraph::new(text)
                         .block(Block::default().title("Confirm").borders(Borders::ALL));
-                    f.render_widget(paragraph, f.size());
+                    f.render_widget(paragraph, f.area());
                 }
             }
         })?;
@@ -251,16 +252,20 @@ fn find_files(dir: &str) -> Vec<String> {
     files
 }
 
+
+
 fn main() -> io::Result<()> {
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
+    let mut stdout = stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
     let mut editor = Editor::new();
     let result = editor.run(&mut terminal);
 
     disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    stdout.execute(LeaveAlternateScreen)?;
 
     result
 }

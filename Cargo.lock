@@ -3,21 +3,6 @@
 version = 4
 
 [[package]]
-name = "UnderTerm"
-version = "0.1.0"
-dependencies = [
- "ansi-to-tui",
- "crossterm 0.27.0",
- "minimp3",
- "rand",
- "ratatui",
- "rodio",
- "serde",
- "serde_json",
- "unicode-width 0.1.14",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1261,6 +1246,21 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "winnow",
+]
+
+[[package]]
+name = "under_term"
+version = "0.1.0"
+dependencies = [
+ "ansi-to-tui",
+ "crossterm 0.27.0",
+ "minimp3",
+ "rand",
+ "ratatui",
+ "rodio",
+ "serde",
+ "serde_json",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
