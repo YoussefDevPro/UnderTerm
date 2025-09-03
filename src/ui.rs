@@ -44,28 +44,44 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         // Draw enemy
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
-        let enemy_height = enemy_text.height() as u16;
-        let enemy_width = enemy_text.width() as u16;
-        let enemy_x = (size.width - enemy_width) / 2;
-        let enemy_y = size.height / 4 - enemy_height / 2;
-        let enemy_area = ratatui::layout::Rect::new(enemy_x, enemy_y, enemy_width, enemy_height);
+        let enemy_height = enemy_text.lines.len() as u16;
+        let mut enemy_width = 0;
+        for line in enemy_text.lines.iter() {
+            let line_width = line.width() as u16;
+            if line_width > enemy_width {
+                enemy_width = line_width;
+            }
+        }
+
+        let enemy_draw_width = enemy_width.min(size.width);
+        let enemy_draw_height = enemy_height.min(size.height);
+
+        let enemy_x = 5; // Positioned on the left
+        let enemy_y = size.height / 4 - enemy_draw_height / 2; // Keep it centered vertically in the top quarter
+
+        let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
         frame.render_widget(Paragraph::new(enemy_text), enemy_area);
 
         // Draw dialogue box
-        let dialogue_box_height = 10;
+        let dialogue_box_height = 10; // Minimum height for the dialogue box
+        let remaining_height = size.height.saturating_sub(enemy_y + enemy_draw_height);
+        let dialogue_box_height = remaining_height.max(min_dialogue_box_height);
+
+        // Draw dialogue box (positioned below enemy ANSI, taking remaining height)
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 10,
-            size.height - dialogue_box_height - 5,
+            enemy_y + enemy_height + 2, // Positioned below enemy ANSI + some padding
             size.width - 20,
             dialogue_box_height,
         );
-        let dialogue_block = Block::default() 
+        let dialogue_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
+            .border_style(Style::default().fg(Color::White)) // White border
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
-        let inner_area = dialogue_box_area.inner(ratatui::layout::Margin { 
+        let inner_area = dialogue_box_area.inner(Margin { 
             vertical: 1,
             horizontal: 1,
         });
@@ -301,7 +317,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             let draw_y = min_y.saturating_sub(game_state.camera_y);
 
             let draw_rect = ratatui::layout::Rect::new(draw_x, draw_y, width, height);
-            let drawing_block = Block::default()
+            let drawing_block = Block::default() 
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Rgb(255, 255, 0)));
             frame.render_widget(drawing_block, draw_rect);
@@ -325,7 +341,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     if game_state.show_message {
-        let message_block = Block::default()
+        let message_block = Block::default() 
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
             .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
@@ -459,7 +475,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let current_map_kind = game_state
             .loaded_maps
             .get(&current_map_key)
-            .map(|m| format!(%{{:?}}, m.kind))
+            .map(|m| format!("{:?}", m.kind))
             .unwrap_or_else(|| "Unknown or deltarune".to_string());
 
         let input_paragraph = Paragraph::new(format!("Current: {}", current_map_kind))

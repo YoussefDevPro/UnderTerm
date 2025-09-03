@@ -46,7 +46,7 @@ pub fn run(
             }
 
             let current_frame_size = terminal.size()?;
-            let mut game_should_exit = false;
+            let game_should_exit = false;
             game_state.update(
                 &key_states,
                 ratatui::layout::Rect::new(

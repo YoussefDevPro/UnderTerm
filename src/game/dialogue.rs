@@ -7,7 +7,7 @@ pub struct Dialogue {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DialogueManager {
     pub dialogues: Vec<Dialogue>,
     pub current_dialogue_index: usize,

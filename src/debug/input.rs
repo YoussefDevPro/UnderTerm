@@ -1,7 +1,7 @@
 use crate::game::state::{GameState, TeleportCreationState};
+use ansi_to_tui::IntoText;
 use crossterm::event::{KeyCode, KeyEvent};
 use std::time::Instant;
-use ansi_to_tui::IntoText;
 
 pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
     if !game_state.debug_mode {
@@ -84,7 +84,10 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
         KeyCode::Char('x') => {
             if !game_state.is_placing_sprite {
                 game_state.is_placing_sprite = true;
-                let sprite_content = std::fs::read_to_string("/home/youssef/UnderTerm/assets/sprites/ME/idle/default.ans").unwrap_or_else(|_| "X".to_string());
+                let sprite_content = std::fs::read_to_string(
+                    "/home/youssef/UnderTerm/assets/sprites/ME/idle/default.ans",
+                )
+                .unwrap_or_else(|_| "X".to_string());
                 let text = sprite_content.as_bytes().into_text().unwrap();
                 let height = text.lines.len() as u32;
                 let mut width = 0;
@@ -96,7 +99,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                 }
 
                 let new_placed_sprite = crate::game::map::PlacedSprite {
-                    id: 0, // Will be assigned when added to map
+                    id: 0,
                     x: game_state.player.x as u32,
                     y: game_state.player.y as u32,
                     width,
@@ -104,7 +107,8 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                     ansi_content: sprite_content,
                 };
                 game_state.pending_placed_sprite = Some(new_placed_sprite);
-                game_state.message = "Placing sprite: Move player to position, press Enter to place.".to_string();
+                game_state.message =
+                    "Placing sprite: Move player to position, press Enter to place.".to_string();
                 game_state.block_player_movement_on_message = false;
             } else {
                 game_state.message = "Finish placing sprite by pressing Enter.".to_string();
@@ -127,7 +131,8 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                     game_state.is_confirming_select_box = false;
                 } else {
                     if let Some((start_x, start_y)) = game_state.select_box_start_coords {
-                        let (end_x, end_y) = (game_state.player.x as u16, game_state.player.y as u16);
+                        let (end_x, end_y) =
+                            (game_state.player.x as u16, game_state.player.y as u16);
                         let current_map_key =
                             (game_state.current_map_row, game_state.current_map_col);
                         if let Some(map_to_modify) =
@@ -233,7 +238,8 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                             game_state.message = "Sprite placed and saved.".to_string();
                         }
                     } else {
-                        game_state.message = "Error: Current map not found for saving sprite.".to_string();
+                        game_state.message =
+                            "Error: Current map not found for saving sprite.".to_string();
                     }
                 } else {
                     game_state.message = "Error: No pending sprite to place.".to_string();

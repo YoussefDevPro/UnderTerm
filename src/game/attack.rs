@@ -6,7 +6,7 @@ pub struct Bullet {
     pub x: f32,
     pub y: f32,
     pub vx: f32, // velocity x
-    pub vy: f32, // velocity y
+    pub vy: f32, // velocity y-ou safe :3
     pub width: u16,
     pub height: u16,
     pub symbol: String,

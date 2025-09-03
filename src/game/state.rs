@@ -256,9 +256,7 @@ impl GameState {
                             let next_char_index = self.dialogue_manager.animated_text.chars().count();
                             self.dialogue_manager.animated_text
                                 .push(dialogue.text.chars().nth(next_char_index).unwrap());
-                            // audio.play_text_sound();
-                            self.message_animation_interval =
-                                Duration::from_millis(thread_rng().gen_range(30..=70));
+                            audio.play_text_sound();
                             self.message_animation_start_time = Instant::now();
                         } else {
                             self.dialogue_manager.text_animation_finished = true;
@@ -295,7 +293,7 @@ impl GameState {
                     let next_char_index = self.animated_message_content.chars().count();
                     self.animated_message_content
                         .push(self.message.chars().nth(next_char_index).unwrap());
-                    audio.play_text_sound();
+                    
                     self.message_animation_interval =
                         Duration::from_millis(thread_rng().gen_range(50..=100));
                     self.message_animation_start_time = Instant::now();
@@ -539,6 +537,7 @@ impl GameState {
                     self.is_flickering = true; // Start flickering
                     self.flicker_count = 10; // Reset flicker count
                     audio.play_enemy_encounter_sound();
+                    
                 }
             }
         }
