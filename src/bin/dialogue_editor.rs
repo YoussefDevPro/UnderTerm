@@ -1,4 +1,4 @@
-use std::io::{stdout, IsTerminal};
+use std::io::stdout;
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -16,6 +16,7 @@ use std::path::Path;
 use under_term::game::dialogue::{Dialogue, DialogueManager};
 use serde_json;
 use std::io;
+use ansi_to_tui::IntoText;
 
 enum EditorState {
     SelectFace,
@@ -94,7 +95,8 @@ impl Editor {
 
                     if let Some(path) = self.faces.get(self.selected_face_index) {
                         let content = fs::read_to_string(path).unwrap_or_default();
-                        let paragraph = Paragraph::new(content)
+                        let text = content.as_bytes().into_text().unwrap();
+                        let paragraph = Paragraph::new(text)
                             .block(Block::default().title("Preview").borders(Borders::ALL));
                         f.render_widget(paragraph, chunks[1]);
                     }
@@ -117,7 +119,8 @@ impl Editor {
 
                     if let Some(path) = self.enemies.get(self.selected_enemy_index) {
                         let content = fs::read_to_string(path).unwrap_or_default();
-                        let paragraph = Paragraph::new(content)
+                        let text = content.as_bytes().into_text().unwrap();
+                        let paragraph = Paragraph::new(text)
                             .block(Block::default().title("Preview").borders(Borders::ALL));
                         f.render_widget(paragraph, chunks[1]);
                     }
@@ -255,17 +258,26 @@ fn find_files(dir: &str) -> Vec<String> {
 
 
 fn main() -> io::Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = setup_terminal()?;
 
     let mut editor = Editor::new();
     let result = editor.run(&mut terminal);
 
-    disable_raw_mode()?;
-    stdout.execute(LeaveAlternateScreen)?;
+    restore_terminal(terminal)?;
 
     result
+}
+
+fn setup_terminal() -> io::Result<Terminal<CrosstermBackend<io::Stdout>>> {
+    enable_raw_mode()?;
+    let mut stdout = stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    Terminal::new(backend)
+}
+
+fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    disable_raw_mode()?;
+    terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.show_cursor()
 }

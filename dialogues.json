@@ -1,17 +1,42 @@
 [
-    {
-        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
-        "face_ansi_path": "assets/sprites/faces/face_3.ans",
-        "text": "Hello there! This is the first dialogue."
-    },
-    {
-        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
-        "face_ansi_path": "assets.sprites/faces/face_smile.ans",
-        "text": "This is the second dialogue. I hope you are having fun!"
-    },
-    {
-        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
-        "face_ansi_path": "assets.sprites/faces/face_meh.ans",
-        "text": "This is the third dialogue. I hope you are having fun!"
-    }
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+    "face_ansi_path": "assets/sprites/faces/face_3.ans",
+    "text": "Hello there! This is the first dialogue."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
+    "face_ansi_path": "assets.sprites/faces/face_smile.ans",
+    "text": "This is the second dialogue. I hope you are having fun!"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
+    "face_ansi_path": "assets.sprites/faces/face_meh.ans",
+    "text": "This is the third dialogue. I hope you are having fun!"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_meh.ans",
+    "face_ansi_path": "assets/sprites/faces/face_meh.ans",
+    "text": "so yeah, i haven't finished the game..."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+    "face_ansi_path": "assets/sprites/faces/face_3.ans",
+    "text": "sowwy :3"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_more_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_neutral.ans",
+    "text": "but i got good reasons..."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_hehehe.ans",
+    "face_ansi_path": "assets/sprites/faces/face_huh.ans",
+    "text": "school is starting, and this game would take forever if i try to finish it"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_sight.ans",
+    "text": "and yeah, my parents are also trying to restrict me in laptop usage, wich really sucks..."
+  }
 ]
