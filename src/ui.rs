@@ -47,7 +47,6 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let size = frame.area();
         frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
-        // Enemy drawing code moved here
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
         let enemy_height = enemy_text.lines.len() as u16;
@@ -66,7 +65,8 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT);
 
         let enemy_x = (size.width as i32 - enemy_draw_width as i32) / 2;
-        let enemy_y = (size.height.saturating_sub(dialogue_box_height + 5)).saturating_sub(enemy_draw_height + 1);
+        let enemy_y = (size.height.saturating_sub(dialogue_box_height + 5))
+            .saturating_sub(enemy_draw_height + 1);
 
         let enemy_area = ratatui::layout::Rect::new(
             enemy_x.max(0) as u16,
@@ -75,11 +75,10 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             enemy_draw_height,
         );
         frame.render_widget(Paragraph::new(enemy_text.clone()), enemy_area);
-        // End of enemy drawing code
 
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 30,
-            size.height.saturating_sub(dialogue_box_height + 5),
+            size.height.saturating_sub(dialogue_box_height + 4),
             size.width - 60,
             dialogue_box_height,
         );
@@ -94,24 +93,31 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
-        let inner_area = dialogue_box_area.inner(Margin {
-            vertical: 3,
-            horizontal: 2,
-        });
+        let face_width = (dialogue_box_area.width as f32 * 0.20) as u16;
+        let face_height = dialogue_box_area.height.saturating_sub(2);
+        let face_area = ratatui::layout::Rect::new(
+            dialogue_box_area.x + 1,
+            dialogue_box_area.y + 1,
+            face_width,
+            face_height,
+        );
 
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
-            .split(inner_area);
+        let text_x = dialogue_box_area.x + face_width + 2;
+        let text_width = dialogue_box_area
+            .width
+            .saturating_sub(face_width)
+            .saturating_sub(3);
+        let text_y = dialogue_box_area.y + 3;
+        let text_height = dialogue_box_area.height.saturating_sub(4);
+        let text_area = ratatui::layout::Rect::new(text_x, text_y, text_width, text_height);
 
-        // Draw face
         let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
         let face_text = face_ansi.as_bytes().into_text().unwrap();
-        frame.render_widget(Paragraph::new(face_text), chunks[0]);
+        frame.render_widget(Paragraph::new(face_text), face_area);
 
         let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
             .wrap(ratatui::widgets::Wrap { trim: true });
-        frame.render_widget(text_paragraph, chunks[1]);
+        frame.render_widget(text_paragraph, text_area);
     }
 }
 

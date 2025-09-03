@@ -1,42 +1,82 @@
 [
   {
-    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
-    "face_ansi_path": "assets/sprites/faces/face_3.ans",
-    "text": "Hello there! This is the first dialogue."
-  },
-  {
-    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
-    "face_ansi_path": "assets.sprites/faces/face_smile.ans",
-    "text": "This is the second dialogue. I hope you are having fun!"
-  },
-  {
-    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
-    "face_ansi_path": "assets.sprites/faces/face_meh.ans",
-    "text": "This is the third dialogue. I hope you are having fun!"
-  },
-  {
-    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_meh.ans",
-    "face_ansi_path": "assets/sprites/faces/face_meh.ans",
-    "text": "so yeah, i haven't finished the game..."
-  },
-  {
-    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
-    "face_ansi_path": "assets/sprites/faces/face_3.ans",
-    "text": "sowwy :3"
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_huh.ans",
+    "text": "haii..."
   },
   {
     "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_more_neutral.ans",
     "face_ansi_path": "assets/sprites/faces/face_neutral.ans",
-    "text": "but i got good reasons..."
+    "text": "i see u already reached an end..."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_meh.ans",
+    "face_ansi_path": "assets/sprites/faces/face_meh.ans",
+    "text": "i understand if ur disappointed, but please, listen to me, i got good reasons"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_huh.ans",
+    "text": "first of all..."
   },
   {
     "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_hehehe.ans",
-    "face_ansi_path": "assets/sprites/faces/face_huh.ans",
-    "text": "school is starting, and this game would take forever if i try to finish it"
+    "face_ansi_path": "assets/sprites/faces/face_hehehe.ans",
+    "text": "there is school!"
   },
   {
     "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
     "face_ansi_path": "assets/sprites/faces/face_sight.ans",
-    "text": "and yeah, my parents are also trying to restrict me in laptop usage, wich really sucks..."
+    "text": "and my parents are doing everything to let me \"focus\" on my study..."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_hehehe.ans",
+    "face_ansi_path": "assets/sprites/faces/face_hehehe.ans",
+    "text": "and they want to hide the laptop for that..."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_determined.ans",
+    "text": "i mean, i still can code, but this will be very difficult, bc ill have to hide from dad and mom.."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+    "face_ansi_path": "assets/sprites/faces/face_3.ans",
+    "text": "sowy guys, but i just can't do it.."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_more_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_neutral.ans",
+    "text": "i hope u understand the situation im in"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_meh.ans",
+    "face_ansi_path": "assets/sprites/faces/face_meh.ans",
+    "text": "but the game was also hard to make , it wasn't ez "
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_determined_smile.ans",
+    "text": "especially when u use smt that shouldn't be used for that.."
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_huh.ans",
+    "text": "sorry again for the disapoinement"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+    "face_ansi_path": "assets/sprites/faces/face_determined.ans",
+    "text": "but i promise that ill try to make atleast, the rune part of the game"
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+    "face_ansi_path": "assets/sprites/faces/face_3.ans",
+    "text": "well, that was a lot of text huh "
+  },
+  {
+    "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+    "face_ansi_path": "assets/sprites/faces/face_3.ans",
+    "text": "thx for listening, cya !"
   }
 ]
