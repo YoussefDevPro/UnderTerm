@@ -13,3 +13,7 @@ unicode-width = "0.1.x"
 rodio = "0.18.0"
 minimp3 = "0.5.0"
 rand = "0.8"
+
+[[bin]]
+name = "dialogue_editor"
+path = "src/bin/dialogue_editor.rs"

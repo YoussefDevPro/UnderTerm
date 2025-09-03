@@ -6,14 +6,9 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-mod audio;
-mod debug;
-mod game;
-mod game_loop;
-mod input;
-mod ui;
+use UnderTerm::*;
 
-use crate::game::state::GameState;
+use UnderTerm::game;
 
 fn run_app() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
@@ -25,7 +20,7 @@ fn run_app() -> io::Result<()> {
         eprintln!("Could not enable keyboard enhancement flags: {:?}", e);
     }
 
-    let mut game_state = GameState::load_game_state()?;
+    let mut game_state = game::state::GameState::load_game_state()?;
     game_state.player.is_walking = false;
     game_state.player.animation_frame = 0;
 
