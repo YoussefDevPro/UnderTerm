@@ -45,9 +45,10 @@ fn draw_enemy_ansi(frame: &mut Frame) {
 fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
     if let Some(dialogue) = game_state.dialogue_manager.current_dialogue() {
         let size = frame.area();
+        frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
         // Draw dialogue box
-        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 10; // Minimum height for the dialogue box
+        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 8; // Minimum height for the dialogue box
         let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 10,
@@ -58,7 +59,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let dialogue_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White)) // White border
+            .border_style(Style::default().fg(Color::White).bg(Color::White)) // White border
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
@@ -69,18 +70,18 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
             .split(inner_area);
-
-        // Draw animated text
-        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
-            .wrap(ratatui::widgets::Wrap { trim: true });
-        frame.render_widget(text_paragraph, chunks[0]);
 
         // Draw face
         let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
         let face_text = face_ansi.as_bytes().into_text().unwrap();
-        frame.render_widget(Paragraph::new(face_text), chunks[1]);
+        frame.render_widget(Paragraph::new(face_text), chunks[0]);
+
+        // Draw animated text
+        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
+            .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(text_paragraph, chunks[1]);
 
         // Draw enemy
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
@@ -96,38 +97,6 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
 
         let enemy_draw_width = enemy_width.min(size.width);
         let enemy_draw_height = enemy_height.min(size.height);
-
-        let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
-        let dialogue_box_area = ratatui::layout::Rect::new(
-            size.x + 10,
-            size.height.saturating_sub(dialogue_box_height + 2), // Position at bottom with some padding
-            size.width - 20,
-            dialogue_box_height,
-        );
-        let dialogue_block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::White)) // White border
-            .title("Dialogue");
-        frame.render_widget(dialogue_block.clone(), dialogue_box_area);
-
-        let inner_area = dialogue_box_area.inner(Margin {
-            vertical: 1,
-            horizontal: 1,
-        });
-
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-            .split(inner_area);
-
-        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
-            .wrap(ratatui::widgets::Wrap { trim: true });
-        frame.render_widget(text_paragraph, chunks[0]);
-
-        let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
-        let face_text = face_ansi.as_bytes().into_text().unwrap();
-        frame.render_widget(Paragraph::new(face_text), chunks[1]);
 
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();

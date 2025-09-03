@@ -8,5 +8,10 @@
         "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
         "face_ansi_path": "assets.sprites/faces/face_smile.ans",
         "text": "This is the second dialogue. I hope you are having fun!"
+    },
+    {
+        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
+        "face_ansi_path": "assets.sprites/faces/face_meh.ans",
+        "text": "This is the third dialogue. I hope you are having fun!"
     }
 ]
