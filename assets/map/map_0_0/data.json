@@ -3916,6 +3916,14 @@
     [
       334,
       43
+    ],
+    [
+      35,
+      4
+    ],
+    [
+      24,
+      23
     ]
   ],
   "select_object_boxes": [
@@ -3949,5 +3957,7 @@
       "events": []
     }
   ],
-  "kind": "empty"
+  "placed_sprites": [],
+  "kind": "empty",
+  "battle_zones": []
 }
