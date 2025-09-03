@@ -1,9 +1,8 @@
-use super::battle::BattleState;
 use super::deltarune::Deltarune;
-use super::face::FaceManager;
+use super::dialogue::DialogueManager;
+
 use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
-use crate::game::battle::BattleMode;
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
 use rand::thread_rng;
@@ -69,20 +68,15 @@ pub struct GameState {
     pub is_map_kind_selection_active: bool,
     pub is_placing_sprite: bool,
     pub pending_placed_sprite: Option<crate::game::map::PlacedSprite>,
-    pub is_drawing_battle_zone: bool,
-    pub battle_zone_start_coords: Option<(u16, u16)>,
-    pub pending_battle_zone: Option<crate::game::map::BattleZone>,
-    pub is_battle_active: bool,
-    pub active_battle_zone_id: Option<u32>,
     pub is_flickering: bool,
     #[serde(skip, default = "default_instant")]
     pub flicker_timer: Instant,
     pub flicker_duration: Duration,
     pub flicker_count: u8,
     pub show_flicker_black_screen: bool,
-    pub battle_page_active: bool,
-    #[serde(skip)]
-    pub battle_state: Option<BattleState>,
+    pub show_enemy_ansi: bool,
+    pub dialogue_manager: DialogueManager,
+    pub dialogue_active: bool,
     pub current_map_name: String,
     pub current_map_row: i32,
     pub current_map_col: i32,
@@ -116,11 +110,7 @@ pub struct GameState {
     pub teleport_transition_timer: Option<Instant>,
     #[serde(skip)]
     pub pending_teleport_destination: Option<(u16, u16, i32, i32, String, u32)>,
-    #[serde(skip)]
-    pub face_manager: FaceManager,
     pub game_over_active: bool,
-    #[serde(skip)]
-    pub battle_transition_timer: Option<Instant>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -167,18 +157,14 @@ impl GameState {
             is_map_kind_selection_active: false,
             is_placing_sprite: false,
             pending_placed_sprite: None,
-            is_drawing_battle_zone: false,
-            battle_zone_start_coords: None,
-            pending_battle_zone: None,
-            is_battle_active: false,
-            active_battle_zone_id: None,
             is_flickering: false,
             flicker_timer: Instant::now(),
-            flicker_duration: Duration::from_millis(75),
+            flicker_duration: Duration::from_millis(25),
             flicker_count: 10,
             show_flicker_black_screen: false,
-            battle_page_active: false,
-            battle_state: None,
+            show_enemy_ansi: false,
+            dialogue_manager: DialogueManager::new(),
+            dialogue_active: false,
             sound_error: None,
             current_map_row,
             current_map_col,
@@ -200,9 +186,7 @@ impl GameState {
             teleport_state: TeleportState::None,
             teleport_transition_timer: None,
             pending_teleport_destination: None,
-            face_manager: FaceManager::new(),
             game_over_active: false,
-            battle_transition_timer: None,
         }
     }
 
@@ -245,24 +229,6 @@ impl GameState {
         delta_time: std::time::Duration,
         audio: &mut crate::audio::Audio,
     ) {
-        // Handle battle transition
-        if let Some(timer) = self.battle_transition_timer {
-            let elapsed = timer.elapsed();
-            let transition_duration = Duration::from_millis(300); // 0.3 seconds
-
-            if elapsed < transition_duration {
-                let progress = elapsed.as_secs_f32() / transition_duration.as_secs_f32();
-                self.deltarune.level = (progress * 100.0) as u8; // Fade to black
-            } else {
-                self.deltarune.level = 0; // Reset darkness
-                self.is_battle_active = true; // Start battle
-                self.battle_page_active = true; // Start battle page
-                self.battle_transition_timer = None; // End transition
-                self.battle_state = Some(BattleState::new()); // Reset battle state
-            }
-            return; // Don't process other updates during transition
-        }
-
         if self.is_flickering {
             if self.flicker_timer.elapsed() >= self.flicker_duration {
                 self.show_flicker_black_screen = !self.show_flicker_black_screen;
@@ -271,21 +237,41 @@ impl GameState {
 
                 if self.flicker_count == 0 {
                     self.is_flickering = false;
-                    self.battle_page_active = true; // Transition to battle page
-                    self.battle_state = Some(BattleState::new()); // Create a new battle
-                    self.show_flicker_black_screen = false; // Ensure not black when transitioning
+                    self.dialogue_active = true;
+                    self.show_flicker_black_screen = false; 
                 }
             }
             return;
         }
 
-        if self.battle_page_active {
-            if let Some(battle_state) = &mut self.battle_state {
-                battle_state.update(delta_time, key_states, audio);
-                if battle_state.mode == BattleMode::GameOver {
-                    self.game_over_active = true;
-                    self.battle_page_active = false;
+        
+
+        if self.dialogue_active {
+            if let Some(dialogue) = self.dialogue_manager.current_dialogue() {
+                if !self.dialogue_manager.text_animation_finished {
+                    // animate text
+                    if self.message_animation_start_time.elapsed() >= self.message_animation_interval {
+                        let current_len = self.dialogue_manager.animated_text.chars().count();
+                        if current_len < dialogue.text.chars().count() {
+                            let next_char_index = self.dialogue_manager.animated_text.chars().count();
+                            self.dialogue_manager.animated_text
+                                .push(dialogue.text.chars().nth(next_char_index).unwrap());
+                            // audio.play_text_sound();
+                            self.message_animation_interval =
+                                Duration::from_millis(thread_rng().gen_range(30..=70));
+                            self.message_animation_start_time = Instant::now();
+                        } else {
+                            self.dialogue_manager.text_animation_finished = true;
+                        }
+                    }
                 }
+            } else {
+                // No more dialogues, transition to dark screen
+                self.dialogue_active = false;
+                self.deltarune.level = 0; // Reset darkness
+                // Start transition to 100
+                // For now, just exit
+                self.show_enemy_ansi = false;
             }
             return;
         }
@@ -550,33 +536,9 @@ impl GameState {
             // Battle Zone Collision Detection
             for battle_zone in &current_map.battle_zones {
                 if battle_zone.to_rect().intersects(player_collision_rect) {
-                    if !self.is_battle_active || self.active_battle_zone_id != Some(battle_zone.id)
-                    {
-                        // Trigger battle transition
-                        self.battle_transition_timer = Some(Instant::now());
-                        self.is_battle_active = false; // Temporarily set to false
-                        self.active_battle_zone_id = Some(battle_zone.id); // Keep track of which battle zone triggered it
-                        self.is_flickering = false; // Reset flicker from encounter
-                        audio.play_enemy_encounter_sound();
-                    }
-                }
-            }
-
-            // Deactivate battle zone if player leaves
-            if self.is_battle_active {
-                if let Some(active_id) = self.active_battle_zone_id {
-                    if let Some(active_zone) =
-                        current_map.battle_zones.iter().find(|z| z.id == active_id)
-                    {
-                        if !active_zone.to_rect().intersects(player_collision_rect) {
-                            self.is_battle_active = false;
-                            self.active_battle_zone_id = None;
-                            self.message = format!("Exited Battle Zone {}", active_id);
-                            self.show_message = true;
-                            self.message_animation_start_time = Instant::now();
-                            self.animated_message_content.clear();
-                        }
-                    }
+                    self.is_flickering = true; // Start flickering
+                    self.flicker_count = 10; // Reset flicker count
+                    audio.play_enemy_encounter_sound();
                 }
             }
         }
@@ -722,7 +684,7 @@ impl GameState {
             self.debug_info.push("--- Key States ---".to_string());
             for (key, pressed) in key_states {
                 if *pressed {
-                    self.debug_info.push(format!("{:?}: pressed", key));
+                    self.debug_info.push(format!("{:?}: pressed ", key));
                 }
             }
         }

@@ -1,0 +1,12 @@
+[
+    {
+        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+        "face_ansi_path": "assets/sprites/faces/face_3.ans",
+        "text": "Hello there! This is the first dialogue."
+    },
+    {
+        "enemy_ansi_path": "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
+        "face_ansi_path": "assets.sprites/faces/face_smile.ans",
+        "text": "This is the second dialogue. I hope you are having fun!"
+    }
+]

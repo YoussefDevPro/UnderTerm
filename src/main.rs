@@ -1,9 +1,7 @@
 use std::io::{self, stdout};
 
 use crossterm::{
-    event::{
-        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-    },
+    event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -30,8 +28,6 @@ fn run_app() -> io::Result<()> {
     let mut game_state = GameState::load_game_state()?;
     game_state.player.is_walking = false;
     game_state.player.animation_frame = 0;
-
-    
 
     let result = game_loop::run(&mut terminal, &mut game_state);
 

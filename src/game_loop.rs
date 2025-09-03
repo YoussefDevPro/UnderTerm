@@ -46,6 +46,7 @@ pub fn run(
             }
 
             let current_frame_size = terminal.size()?;
+            let mut game_should_exit = false;
             game_state.update(
                 &key_states,
                 ratatui::layout::Rect::new(
@@ -57,6 +58,10 @@ pub fn run(
                 delta_time,
                 &mut audio,
             );
+
+            if game_should_exit {
+                return Ok(());
+            }
 
             terminal.draw(|frame| {
                 ui::draw(frame, game_state);

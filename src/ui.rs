@@ -1,593 +1,105 @@
 use crate::debug;
-use crate::game::battle::{BattleButton, BattleMode, BattleState};
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
-use rand::Rng;
-use ratatui::prelude::{Line, Rect, Span, Text};
-
-use std::time::Duration;
-
-const FIGHT_ASCII: &str = "▄                      \n █    █▀▀ ▀ █▀▀ █ █ ▀█▀\n  █▄▀ █▀  █ █▄█ █▀█  █ \n ▀ ▀▄                  ";
-const MERCY_ASCII: &str = "▀▄ ▄▀  █▀▄▀█ █▀█ █▀█ █▀ █ █\n ▄▀▄   █ ▀ █ █▄▄ █   █▄  █ \n▀   ▀                  ";
-const ACT_ASCII: &str = "  ▄            \n▄  █ ▄▀█ █▀ ▀█▀\n █ █ █▀█ █▄  █ \n▀  █           \n  ▀            ";
-const ITEM_ASCII: &str = " ▀▀▀  ▀ ▀█▀ █▀█ █▀▄▀█\n■███■ █  █  █▄▄ █ ▀ █\n  ▀                  ";
-const SELECTED_HEART_ASCII: &str = " ▄ ▄ \n■█▄█■\n ▀█▀ ";
-const SELECTED_HEART_ASCII_WIDTH: usize = 5;
+use ratatui::prelude::Text;
 
 use ratatui::{ 
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, BorderType, Clear, Gauge, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame,
 };
 
-fn draw_battle(frame: &mut Frame, battle_state: &mut BattleState, game_state: &GameState) {
+fn draw_enemy_ansi(frame: &mut Frame) {
     let size = frame.area();
     let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
 
-    let fight_height = FIGHT_ASCII.lines().count() as u16;
-    let mercy_height = MERCY_ASCII.lines().count() as u16;
-    let act_height = ACT_ASCII.lines().count() as u16;
-    let item_height = ITEM_ASCII.lines().count() as u16;
-
-    let max_button_content_height = fight_height.max(mercy_height).max(act_height).max(item_height);
-    let button_area_height = max_button_content_height + 2; // +2 for top and bottom borders
-
-    // Main layout
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(60), // Enemy area
-            Constraint::Percentage(40), // Player area
-        ])
-        .split(size);
-
-    // Draw enemy
-    if !battle_state.enemy.sprite_frames.is_empty() {
-        let enemy_sprite = battle_state.enemy.sprite_frames[battle_state.enemy.current_frame].clone();
-        let mut enemy_text = enemy_sprite.as_bytes().into_text().unwrap();
-        let enemy_height = enemy_text.lines.len() as u16;
-        let mut enemy_width = 0;
-        for line in enemy_text.lines.iter() {
-            let line_width = line.width() as u16;
-            if line_width > enemy_width {
-                enemy_width = line_width;
-            }
+    let ansi_content = std::fs::read_to_string("assets/sprites/enemy/not_a_placeholder/battle_3.ans").unwrap_or_else(|_| "Error reading file".to_string());
+    let enemy_text = ansi_content.as_bytes().into_text().unwrap();
+    let enemy_height = enemy_text.lines.len() as u16;
+    let mut enemy_width = 0;
+    for line in enemy_text.lines.iter() {
+        let line_width = line.width() as u16;
+        if line_width > enemy_width {
+            enemy_width = line_width;
         }
-
-        // Clamp enemy dimensions to the available area
-        let enemy_draw_width = enemy_width.min(chunks[0].width);
-        let enemy_draw_height = enemy_height.min(chunks[0].height);
-
-        let mut enemy_x = (chunks[0].x + (chunks[0].width.saturating_sub(enemy_draw_width)) / 2) as i32;
-        let enemy_y = chunks[0].y + (chunks[0].height.saturating_sub(enemy_draw_height)) / 2;
-
-        if battle_state.enemy.is_shaking {
-            enemy_x += rand::thread_rng().gen_range(-1..=1);
-        }
-
-        // Apply black foreground if in Defend mode
-        if battle_state.mode == BattleMode::Defend {
-            enemy_text = game_state.darken_text(enemy_text, 100); // 100 means completely black
-        }
-
-        let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
-        let enemy_paragraph = Paragraph::new(enemy_text);
-        frame.render_widget(enemy_paragraph, enemy_area);
     }
 
-    // Player area layout
-    let player_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0), // Main box
-            Constraint::Length(button_area_height), // Buttons
-        ])
-        .split(chunks[1]);
+    let enemy_draw_width = enemy_width.min(size.width);
+    let enemy_draw_height = enemy_height.min(size.height);
 
-    let bottom_area = player_chunks[1];
+    let enemy_x = (size.x + (size.width.saturating_sub(enemy_draw_width)) / 2) as i32;
+    let enemy_y = size.y + (size.height.saturating_sub(enemy_draw_height)) / 2;
 
-    let bottom_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(70), // Buttons
-            Constraint::Percentage(30), // HP
-        ])
-        .split(bottom_area);
-    
-    let button_area = bottom_chunks[0];
-    let hp_area = bottom_chunks[1];
+    let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
+    let enemy_paragraph = Paragraph::new(enemy_text);
+    frame.render_widget(enemy_paragraph, enemy_area);
+}
 
-    // HP Gauge
-    let hp_label = format!("HP {} / {}", battle_state.player_hp, battle_state.player_max_hp);
-    let gauge = Gauge::default()
-        .block(Block::default().title("KR"))
-        .gauge_style(Style::default().fg(Color::Rgb(255, 255, 0)).bg(Color::Rgb(255, 0, 0)))
-        .label(hp_label)
-        .ratio((battle_state.player_hp as f64) / (battle_state.player_max_hp as f64));
-    frame.render_widget(gauge, hp_area);
+fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
+    if let Some(dialogue) = game_state.dialogue_manager.current_dialogue() {
+        let size = frame.area();
 
-    let buttons_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-        ])
-        .split(button_area);
+        // Draw enemy
+        let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
+        let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
+        let enemy_height = enemy_text.height() as u16;
+        let enemy_width = enemy_text.width() as u16;
+        let enemy_x = (size.width - enemy_width) / 2;
+        let enemy_y = size.height / 4 - enemy_height / 2;
+        let enemy_area = ratatui::layout::Rect::new(enemy_x, enemy_y, enemy_width, enemy_height);
+        frame.render_widget(Paragraph::new(enemy_text), enemy_area);
 
-    let buttons = [
-        (BattleButton::Fight, FIGHT_ASCII, buttons_layout[0]),
-        (BattleButton::Act, ACT_ASCII, buttons_layout[1]),
-        (BattleButton::Item, ITEM_ASCII, buttons_layout[2]),
-        (BattleButton::Mercy, MERCY_ASCII, buttons_layout[3]),
-    ];
-
-    let heart_lines: Vec<String> = SELECTED_HEART_ASCII.lines().map(|s| s.to_string()).collect();
-
-    for (button_type, ascii_art, area) in &buttons {
-        let mut style = Style::default().fg(Color::Rgb(255, 165, 0)); // Orange
-        if *button_type == BattleButton::Mercy {
-            style = Style::default().fg(Color::Rgb(128, 128, 128));
-        }
-
-        let mut lines: Vec<Line> = ascii_art.lines().map(|s| Line::from(s.trim_end().to_string())).collect();
-
-        if battle_state.selected_button == *button_type {
-            for (i, line) in lines.iter_mut().enumerate() {
-                if i < heart_lines.len() {
-                    let heart_line_str = &heart_lines[i];
-                    let original_content = line.spans[0].content.to_string();
-
-                    // Take the part of the original content *after* the heart_line_str characters
-                    let remaining_content = original_content.chars().skip(heart_line_str.chars().count()).collect::<String>();
-
-                    // Create a new Line with the heart and the remaining content
-                    *line = Line::from(vec![
-                        Span::styled(heart_line_str.clone(), Style::default().fg(Color::Rgb(255, 0, 0))),
-                        Span::styled(remaining_content.trim_end().to_string(), style),
-                    ]);
-                } else {
-                    // If heart has fewer lines than button art, just clear the first SELECTED_HEART_ASCII_WIDTH chars
-                    let original_content = line.spans[0].content.to_string();
-                    let remaining_content = original_content.chars().skip(SELECTED_HEART_ASCII_WIDTH).collect::<String>();
-                    *line = Line::from(vec![
-                        Span::raw(" ".repeat(SELECTED_HEART_ASCII_WIDTH)),
-                        Span::styled(remaining_content.trim_end().to_string(), style),
-                    ]);
-                }
-            }
-        }
-
-        let button_block = Block::default()
+        // Draw dialogue box
+        let dialogue_box_height = 10;
+        let dialogue_box_area = ratatui::layout::Rect::new(
+            size.x + 10,
+            size.height - dialogue_box_height - 5,
+            size.width - 20,
+            dialogue_box_height,
+        );
+        let dialogue_block = Block::default() 
             .borders(Borders::ALL)
-            .border_type(BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 165, 0)).bg(Color::Rgb(0, 0, 0))); // Orange border
+            .border_type(ratatui::widgets::BorderType::Thick)
+            .title("Dialogue");
+        frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
-        frame.render_widget(button_block, *area);
-        frame.render_widget(Paragraph::new(lines).style(style).alignment(ratatui::layout::Alignment::Center), *area);
+        let inner_area = dialogue_box_area.inner(ratatui::layout::Margin { 
+            vertical: 1,
+            horizontal: 1,
+        });
+
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+            .split(inner_area);
+
+        // Draw animated text
+        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
+            .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(text_paragraph, chunks[0]);
+
+        // Draw face
+        let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
+        let face_text = face_ansi.as_bytes().into_text().unwrap();
+        frame.render_widget(Paragraph::new(face_text), chunks[1]);
     }
-
-    // Main content box
-    let box_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Thick).border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
-    let box_area = player_chunks[0];
-    frame.render_widget(box_block.clone(), box_area);
-
-    // Draw content inside the main box based on the mode
-    match battle_state.mode {
-        BattleMode::Menu => {
-            let message = Paragraph::new(battle_state.message.join("\n"))
-                .style(Style::default().fg(Color::Rgb(255, 255, 255)))
-                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
-            frame.render_widget(message, box_area);
-        }
-        BattleMode::Act => {
-            let mut act_lines = Vec::new();
-            for (i, option) in battle_state.act_options.iter().enumerate() {
-                if i == battle_state.selected_act_option {
-                    act_lines.push(Line::from(vec![ 
-                        Span::styled("❤ ", Style::default().fg(Color::Rgb(255, 0, 0))),
-                        Span::styled(format!("* {}", option), Style::default().fg(Color::Rgb(255, 255, 255))),
-                    ]));
-                } else {
-                    act_lines.push(Line::from(vec![ 
-                        Span::raw("  "),
-                        Span::styled(format!("* {}", option), Style::default().fg(Color::Rgb(255, 255, 255))),
-                    ]));
-                }
-            }
-            let act_list = Paragraph::new(act_lines)
-                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
-            frame.render_widget(act_list, box_area);
-        }
-        BattleMode::Item => {
-            let item_text = Paragraph::new("Item mode placeholder")
-                .style(Style::default().fg(Color::Rgb(255, 255, 255)))
-                .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
-            frame.render_widget(item_text, box_area);
-        }
-        BattleMode::Attack => {
-            let slider_width = 50;
-            let slider_area = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(40),
-                    Constraint::Length(1),
-                    Constraint::Percentage(40),
-                ])
-                .split(box_area.inner(Margin { vertical: 0, horizontal: (box_area.width.saturating_sub(slider_width)) / 2 }))[1];
-
-            let slider_bar = "[".to_string() + &"=".repeat(slider_width as usize) + "]";
-            let slider_paragraph = Paragraph::new(slider_bar).style(Style::default().fg(Color::Rgb(255, 255, 255)));
-            frame.render_widget(slider_paragraph, slider_area);
-
-            let red_center_width = slider_width / 10;
-            let red_center_start = slider_area.x + (slider_width / 2) - (red_center_width / 2);
-            let red_center_area = ratatui::layout::Rect::new(red_center_start, slider_area.y, red_center_width, 1);
-            let red_center_paragraph = Paragraph::new("=".repeat(red_center_width as usize)).style(Style::default().fg(Color::Rgb(255, 0, 0)));
-            frame.render_widget(red_center_paragraph, red_center_area);
-
-            let stick_position = (battle_state.attack_slider.position / 100.0 * slider_width as f32) as u16;
-            let stick_area = ratatui::layout::Rect::new(slider_area.x + stick_position, slider_area.y, 1, 1);
-            let stick = Paragraph::new("|").style(Style::default().fg(Color::Rgb(255, 255, 0)));
-            frame.render_widget(stick, stick_area);
-        }
-        BattleMode::Defend => {
-            // The bullet board is a large, centered rectangle
-            let board_area = ratatui::layout::Rect {
-                x: size.width / 4,
-                y: size.height / 4,
-                width: size.width / 2,
-                height: size.height / 2,
-            };
-            battle_state.bullet_board_size = (board_area.width, board_area.height);
-
-            let board_block = Block::default().borders(Borders::ALL).border_type(BorderType::Thick).style(Style::default().bg(Color::Rgb(0, 0, 0))).border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
-            frame.render_widget(board_block, board_area);
-
-            let heart_sprite = "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ";
-            // Clamp heart position to be within the bullet board area to prevent panic
-            let heart_x_f = battle_state.player_heart.x.max(0.0).min(board_area.width as f32 - battle_state.player_heart.width as f32);
-            let heart_y_f = battle_state.player_heart.y.max(0.0).min(board_area.height as f32 - battle_state.player_heart.height as f32);
-            let heart_x = board_area.x + heart_x_f as u16;
-            let heart_y = board_area.y + heart_y_f as u16;
-
-            let heart_area = ratatui::layout::Rect::new(heart_x, heart_y, battle_state.player_heart.width, battle_state.player_heart.height);
-            let heart_paragraph = Paragraph::new(heart_sprite).style(Style::default().fg(Color::Rgb(255, 0, 0)));
-            if battle_state.is_flickering && battle_state.flicker_timer.elapsed().as_millis() % 200 < 100 {
-                // Don't draw the heart if flickering and in the "off" phase
-            } else {
-                frame.render_widget(heart_paragraph, heart_area);
-            }
-
-            // Draw bullets
-            for bullet in &battle_state.bullets {
-                let bullet_x = board_area.x + bullet.x as u16;
-                let bullet_y = board_area.y + bullet.y as u16;
-                if bullet_x < board_area.right() && bullet_y < board_area.bottom() {
-                    let bullet_p = Paragraph::new(bullet.symbol.clone()).style(Style::default().fg(Color::Rgb(255, 255, 255)));
-                    frame.render_widget(bullet_p, ratatui::layout::Rect::new(bullet_x, bullet_y, bullet.width, bullet.height));
-                }
-            }
-
-            // Draw gun if present
-            if let Some(gun_state) = &battle_state.gun_state {
-                use crate::game::battle::GunState;
-                use crate::game::battle::GunDirection;
-                use ansi_to_tui::IntoText;
-
-                let (gun_art, gun_width, gun_height) = match gun_state {
-                    GunState::Charging { direction, .. } | GunState::Firing { direction, .. } => {
-                        match direction {
-                            GunDirection::Up => ("  ▲  \n █ \n███", 5, 3),
-                            GunDirection::Down => ("███\n █ \n  ▼  ", 5, 3),
-                            GunDirection::Left => (" █───\n████ \n █───", 6, 3),
-                            GunDirection::Right => ("───█ \n ████\n───█ ", 6, 3),
-                        }
-                    }
-                };
-
-                let (gun_x, gun_y, _) = match gun_state {
-                    GunState::Charging { x, y, direction, .. } => (*x, *y, direction),
-                    GunState::Firing { x, y, direction, .. } => (*x, *y, direction),
-                };
-
-                let gun_text = gun_art.as_bytes().into_text().unwrap();
-                let gun_paragraph = Paragraph::new(gun_text).style(Style::default().fg(Color::Rgb(255, 255, 0)));
-
-                let draw_x = board_area.x + gun_x as u16;
-                let draw_y = board_area.y + gun_y as u16;
-
-                let gun_rect = ratatui::layout::Rect::new(draw_x, draw_y, gun_width, gun_height);
-                frame.render_widget(gun_paragraph, gun_rect);
-            }
-        }
-        BattleMode::GameOverTransition => {
-            draw_game_over_transition(frame, battle_state);
-        }
-        BattleMode::GameOver => {
-            draw_game_over(frame);
-        }
-        _ => { // For Narrative
-            if battle_state.mode == BattleMode::Narrative || battle_state.mode == BattleMode::OpeningNarrative {
-                let face_width = battle_state.narrative_face.as_ref()
-                    .and_then(|name| game_state.face_manager.faces.get(name))
-                    .map_or(0, |face| face.width + 1); // +1 for spacing
-
-                let narrative_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(face_width),
-                        Constraint::Min(0),
-                    ])
-                    .split(box_area.inner(Margin { vertical: 1, horizontal: 1 }));
-
-                if face_width > 0 {
-                    if let Some(face_name) = &battle_state.narrative_face {
-                        if let Some(face) = game_state.face_manager.faces.get(face_name) {
-                            let face_text = face.content.as_bytes().into_text().unwrap();
-                            let face_paragraph = Paragraph::new(face_text);
-                            frame.render_widget(face_paragraph, narrative_chunks[0]);
-                        }
-                    }
-                }
-
-                let narrative_paragraph = Paragraph::new(battle_state.animated_narrative_content.clone())
-                    .wrap(ratatui::widgets::Wrap { trim: true })
-                    .style(Style::default().fg(Color::Rgb(255, 255, 255)));
-                frame.render_widget(narrative_paragraph, narrative_chunks[1]);
-            } else {
-                let text = Paragraph::new("...")
-                    .style(Style::default().fg(Color::Rgb(255, 255, 255)))
-                    .block(Block::default().padding(ratatui::widgets::Padding::new(2, 2, 1, 1)));
-                frame.render_widget(text, box_area);
-            }
-        }
-    }
-}
-
-fn draw_game_over_transition(frame: &mut Frame, battle_state: &mut BattleState) {
-    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), frame.area());
-    let elapsed = battle_state.game_over_timer.elapsed();
-
-    let heart_sprite = if elapsed < Duration::from_secs(1) {
-        "  ▄ ▄  \n■██▄██■\n ▀███▀ \n   ▀   ".to_string()
-    } else {
-        "       \n■█ ▄█■\n ▀█ █▀ \n  ▀ ▀  ".to_string()
-    };
-
-    let heart_paragraph = Paragraph::new(heart_sprite)
-        .style(Style::default().fg(Color::Rgb(255, 0, 0)))
-        .alignment(ratatui::layout::Alignment::Center);
-    
-    frame.render_widget(heart_paragraph, frame.area());
-}
-
-fn draw_game_over(frame: &mut Frame) {
-    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), frame.area());
-    let game_over_text = "GAME OVER";
-    let p = Paragraph::new(game_over_text)
-        .style(Style::default().fg(Color::Rgb(255, 255, 255)))
-        .alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(p, frame.area());
-
-    // Add replay button
-    let replay_text = "Press Enter to Replay";
-    let replay_p = Paragraph::new(replay_text)
-        .style(Style::default().fg(Color::Rgb(255, 255, 255)))
-        .alignment(ratatui::layout::Alignment::Center);
-
-    let area = frame.area();
-    let replay_area = ratatui::layout::Rect::new(area.x, area.y + area.height / 2 + 2, area.width, 1);
-    frame.render_widget(replay_p, replay_area);
 }
 
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
 
-    if game_state.battle_page_active {
-        let mut temp_battle_state = game_state.battle_state.take();
-        if let Some(battle_state) = &mut temp_battle_state {
-            draw_battle(frame, battle_state, game_state);
-        } else {
-            // This should not happen, but as a fallback
-            frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
-            let text = Paragraph::new("Battle active, but no state found!")
-                .style(Style::default().fg(Color::Rgb(255, 0, 0)));
-            frame.render_widget(text, size);
-        }
-        game_state.battle_state = temp_battle_state; // Put it back
+    if game_state.dialogue_active {
+        draw_dialogue(frame, game_state);
         return;
-    } else if game_state.game_over_active {
-        draw_game_over(frame);
-        return;
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
-    } else if game_state.battle_transition_timer.is_some() {
-        // Draw map and player (already drawn by default)
-
-        // Calculate transition progress
-        let elapsed = game_state.battle_transition_timer.unwrap().elapsed();
-        let transition_duration = Duration::from_millis(300);
-        let progress = (elapsed.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0);
-
-        // Calculate shrinking rectangle (from full screen to battle box size)
-        let current_x_offset = (size.width as f32 * progress / 2.0) as u16;
-        let current_y_offset = (size.height as f32 * progress / 2.0) as u16;
-        let _current_width_inner = size.width.saturating_sub(2 * current_x_offset);
-        let current_height_inner = size.height.saturating_sub(2 * current_y_offset);
-
-        // Draw black rectangle that grows from edges towards center
-        let top_rect = Rect::new(0, 0, size.width, current_y_offset);
-        let bottom_rect = Rect::new(0, size.height.saturating_sub(current_y_offset), size.width, current_y_offset);
-        let left_rect = Rect::new(0, current_y_offset, current_x_offset, current_height_inner);
-        let right_rect = Rect::new(size.width.saturating_sub(current_x_offset), current_y_offset, current_x_offset, current_height_inner);
-
-        frame.render_widget(Clear, top_rect);
-        frame.render_widget(Clear, bottom_rect);
-        frame.render_widget(Clear, left_rect);
-        frame.render_widget(Clear, right_rect);
-
-        return; // Don't draw overworld map again
     }
+
+    if game_state.show_enemy_ansi {
+        draw_enemy_ansi(frame);
+        return;
+    }
+
 
     frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
@@ -660,7 +172,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         (game_state.player.x as i32).saturating_sub(game_state.camera_x as i32);
     let player_y_on_screen =
         (game_state.player.y as i32).saturating_sub(game_state.camera_y as i32);
-    drawable_elements.push((
+    drawable_elements.push(( 
         player_y_on_screen + player_sprite_height as i32,
         1,
         player_sprite_content,
@@ -674,7 +186,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         if let Some(pending_sprite) = &game_state.pending_placed_sprite {
             let sprite_x_on_screen = pending_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = pending_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push((
+            drawable_elements.push(( 
                 sprite_y_on_screen + pending_sprite.height as i32,
                 0,
                 pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -690,7 +202,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         for placed_sprite in &current_map.placed_sprites {
             let sprite_x_on_screen = placed_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = placed_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push((
+            drawable_elements.push(( 
                 sprite_y_on_screen + placed_sprite.height as i32,
                 0,
                 placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -947,7 +459,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let current_map_kind = game_state
             .loaded_maps
             .get(&current_map_key)
-            .map(|m| format!("{:?}", m.kind))
+            .map(|m| format!(%{{:?}}, m.kind))
             .unwrap_or_else(|| "Unknown or deltarune".to_string());
 
         let input_paragraph = Paragraph::new(format!("Current: {}", current_map_kind))

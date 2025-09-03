@@ -217,9 +217,7 @@ impl Map {
         self.placed_sprites.push(placed_sprite);
     }
 
-    pub fn add_battle_zone(&mut self, battle_zone: BattleZone) {
-        self.battle_zones.push(battle_zone);
-    }
+    
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let base_path = Path::new("assets/map").join(map_name);
