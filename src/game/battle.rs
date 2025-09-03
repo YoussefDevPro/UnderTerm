@@ -144,7 +144,7 @@ impl BattleState {
                                         Duration::from_millis(300) 
                                     }
                                 }
-                                _ => Duration::from_millis(rand::thread_rng().gen_range(30..=70)),
+                                _ => Duration::from_millis(rand::thread_rng().gen_range(10..=30)),
                             };
                             self.narrative_animation_start_time = Instant::now();
                         } else {

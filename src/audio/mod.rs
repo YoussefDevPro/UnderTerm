@@ -19,7 +19,11 @@ impl Audio {
     }
 
     pub fn play_open_settings_sound(&self) {
-        let file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sound/open_settings.mp3")).unwrap();
+        let file = File::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets/sound/open_settings.mp3"
+        ))
+        .unwrap();
         let decoder = Decoder::new(BufReader::new(file)).unwrap();
         self.stream_handle
             .play_raw(decoder.convert_samples())
@@ -30,12 +34,17 @@ impl Audio {
         let file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sound/A.mp3")).unwrap();
         let decoder = Decoder::new(BufReader::new(file)).unwrap();
         let sink = rodio::Sink::try_new(&self.stream_handle).unwrap();
+        sink.set_volume(4.0);
         sink.append(decoder.convert_samples::<f32>());
         self._text_sound_sink = Some(sink);
     }
 
     pub fn play_enemy_encounter_sound(&self) {
-        let file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sound/enemy_encounter.mp3")).unwrap();
+        let file = File::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets/sound/enemy_encounter.mp3"
+        ))
+        .unwrap();
         let decoder = Decoder::new(BufReader::new(file)).unwrap();
         self.stream_handle
             .play_raw(decoder.convert_samples())

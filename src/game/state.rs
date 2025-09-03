@@ -300,7 +300,7 @@ impl GameState {
                         .push(self.message.chars().nth(next_char_index).unwrap());
 
                     self.message_animation_interval =
-                        Duration::from_millis(thread_rng().gen_range(50..=100));
+                        Duration::from_millis(thread_rng().gen_range(20..=50));
                     self.message_animation_start_time = Instant::now();
                 } else {
                     self.message_animation_finished = true;
