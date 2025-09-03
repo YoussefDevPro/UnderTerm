@@ -1,6 +1,7 @@
 use std::io::{self, stdout};
 
 use crossterm::{
+    event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -18,11 +19,11 @@ fn run_app() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
-    // if let Err(e) = stdout().execute(PushKeyboardEnhancementFlags(
-    //     KeyboardEnhancementFlags::REPORT_EVENT_TYPES,
-    // )) {
-    //     eprintln!("Could not enable keyboard enhancement flags: {:?}", e);
-    // }
+    if let Err(e) = stdout().execute(PushKeyboardEnhancementFlags(
+        KeyboardEnhancementFlags::REPORT_EVENT_TYPES,
+    )) {
+        eprintln!("Could not enable keyboard enhancement flags: {:?}", e);
+    }
 
     let mut game_state = GameState::load_game_state()?;
     game_state.player.is_walking = false;
@@ -32,9 +33,9 @@ fn run_app() -> io::Result<()> {
 
     let result = game_loop::run(&mut terminal, &mut game_state);
 
-    // if let Err(e) = stdout().execute(PopKeyboardEnhancementFlags) {
-    //     eprintln!("Could not disable keyboard enhancement flags: {:?}", e);
-    // }
+    if let Err(e) = stdout().execute(PopKeyboardEnhancementFlags) {
+        eprintln!("Could not disable keyboard enhancement flags: {:?}", e);
+    }
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?;
 

@@ -195,7 +195,10 @@ impl GameState {
             current_map_name: self.current_map_name.clone(),
         };
         let serialized = serde_json::to_string(&save_data)?;
-        std::fs::write(concat!(env!("CARGO_MANIFEST_DIR"), "/game_data.json"), serialized)?;
+        std::fs::write(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/game_data.json"),
+            serialized,
+        )?;
         Ok(())
     }
 
@@ -238,23 +241,25 @@ impl GameState {
                 if self.flicker_count == 0 {
                     self.is_flickering = false;
                     self.dialogue_active = true;
-                    self.show_flicker_black_screen = false; 
+                    self.show_flicker_black_screen = false;
                 }
             }
             return;
         }
 
-        
-
         if self.dialogue_active {
             if let Some(dialogue) = self.dialogue_manager.current_dialogue() {
                 if !self.dialogue_manager.text_animation_finished {
                     // animate text
-                    if self.message_animation_start_time.elapsed() >= self.message_animation_interval {
+                    if self.message_animation_start_time.elapsed()
+                        >= self.message_animation_interval
+                    {
                         let current_len = self.dialogue_manager.animated_text.chars().count();
                         if current_len < dialogue.text.chars().count() {
-                            let next_char_index = self.dialogue_manager.animated_text.chars().count();
-                            self.dialogue_manager.animated_text
+                            let next_char_index =
+                                self.dialogue_manager.animated_text.chars().count();
+                            self.dialogue_manager
+                                .animated_text
                                 .push(dialogue.text.chars().nth(next_char_index).unwrap());
                             audio.play_text_sound();
                             self.message_animation_start_time = Instant::now();
@@ -267,8 +272,8 @@ impl GameState {
                 // No more dialogues, transition to dark screen
                 self.dialogue_active = false;
                 self.deltarune.level = 0; // Reset darkness
-                // Start transition to 100
-                // For now, just exit
+                                          // Start transition to 100
+                                          // For now, just exit
                 self.show_enemy_ansi = false;
             }
             return;
@@ -293,7 +298,7 @@ impl GameState {
                     let next_char_index = self.animated_message_content.chars().count();
                     self.animated_message_content
                         .push(self.message.chars().nth(next_char_index).unwrap());
-                    
+
                     self.message_animation_interval =
                         Duration::from_millis(thread_rng().gen_range(50..=100));
                     self.message_animation_start_time = Instant::now();
@@ -378,7 +383,7 @@ impl GameState {
                             .intersects(player_collision_rect)
                         {
                             self.just_teleported = false;
-                            self.last_teleport_destination_box_id = None; // Clear destination box ID
+                            self.last_teleport_destination_box_id = None;
                             self.teleport_cooldown_timer = Some(Instant::now());
                         }
                     } else {
@@ -452,9 +457,8 @@ impl GameState {
                             if select_box.events.iter().any(|e| {
                                 matches!(e, crate::game::map::Event::TeleportPlayer { .. })
                             }) {
-                                // this is a teleport box, and we are still in it with collision
-                                // no need to re-teleport, just ensure we don't trigger messages
-                                // if we are already past them.
+                                // if we just teleported in a tp box, we don't tp, until we get out
+                                // of it :3
                             }
                         }
                         continue;
@@ -469,15 +473,15 @@ impl GameState {
 
                 if select_box.to_rect().intersects(player_collision_rect) {
                     if self.just_teleported {
-                        continue; // Just teleported, ignore this zone for now
+                        continue;
                     }
                     if let Some(timer) = self.teleport_cooldown_timer {
                         if timer.elapsed() < crate::game::config::TELEPORT_COOLDOWN_DURATION {
-                            continue; // Still in cooldown
+                            continue;
                         }
                     }
                     if self.recently_teleported_from_box_id == Some(select_box.id) {
-                        continue; // Already teleported from this box, prevent immediate re-teleport
+                        continue;
                     }
 
                     for event in &select_box.events {
@@ -531,13 +535,11 @@ impl GameState {
                 }
             }
 
-            // Battle Zone Collision Detection
             for battle_zone in &current_map.battle_zones {
                 if battle_zone.to_rect().intersects(player_collision_rect) {
-                    self.is_flickering = true; // Start flickering
-                    self.flicker_count = 10; // Reset flicker count
-                    // audio.play_enemy_encounter_sound();
-                    
+                    self.is_flickering = true;
+                    self.flicker_count = 10;
+                    audio.play_enemy_encounter_sound();
                 }
             }
         }

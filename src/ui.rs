@@ -3,7 +3,7 @@ use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
 use ratatui::prelude::Text;
 
-use ratatui::{ 
+use ratatui::{
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
@@ -15,7 +15,11 @@ fn draw_enemy_ansi(frame: &mut Frame) {
     let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
 
-        let ansi_content = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_3.ans")).unwrap_or_else(|_| "Error reading file".to_string());
+    let ansi_content = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/sprites/enemy/not_a_placeholder/battle_3.ans"
+    ))
+    .unwrap_or_else(|_| "Error reading file".to_string());
     let enemy_text = ansi_content.as_bytes().into_text().unwrap();
     let enemy_height = enemy_text.lines.len() as u16;
     let mut enemy_width = 0;
@@ -32,7 +36,8 @@ fn draw_enemy_ansi(frame: &mut Frame) {
     let enemy_x = (size.x + (size.width.saturating_sub(enemy_draw_width)) / 2) as i32;
     let enemy_y = size.y + (size.height.saturating_sub(enemy_draw_height)) / 2;
 
-    let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
+    let enemy_area =
+        ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
     let enemy_paragraph = Paragraph::new(enemy_text);
     frame.render_widget(enemy_paragraph, enemy_area);
 }
@@ -57,7 +62,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
-        let inner_area = dialogue_box_area.inner(Margin { 
+        let inner_area = dialogue_box_area.inner(Margin {
             vertical: 1,
             horizontal: 1,
         });
@@ -92,7 +97,6 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let enemy_draw_width = enemy_width.min(size.width);
         let enemy_draw_height = enemy_height.min(size.height);
 
-        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 10; // Minimum height for the dialogue box
         let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 10,
@@ -107,7 +111,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             .title("Dialogue");
         frame.render_widget(dialogue_block.clone(), dialogue_box_area);
 
-        let inner_area = dialogue_box_area.inner(Margin { 
+        let inner_area = dialogue_box_area.inner(Margin {
             vertical: 1,
             horizontal: 1,
         });
@@ -117,17 +121,14 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
             .split(inner_area);
 
-        // Draw animated text
         let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
             .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(text_paragraph, chunks[0]);
 
-        // Draw face
         let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), chunks[1]);
 
-        // Draw enemy
         let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
         let enemy_height = enemy_text.lines.len() as u16;
@@ -142,13 +143,24 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let enemy_draw_width = enemy_width.min(size.width);
         let enemy_draw_height = enemy_height.min(size.height);
 
-        let enemy_x = (size.width as i32 - enemy_draw_width as i32) / 2; // Center horizontally
-        let enemy_y = dialogue_box_area.y.saturating_sub(enemy_draw_height + 1); // Position above dialogue box
+        let enemy_x = (size.width as i32 - enemy_draw_width as i32) / 2; // thats how we center
+                                                                         // things in 2025 ദ്ദി/ᐠ｡‸｡ᐟ\
+        let enemy_y = dialogue_box_area.y.saturating_sub(enemy_draw_height + 1);
 
-        let enemy_area = ratatui::layout::Rect::new(enemy_x.max(0) as u16, enemy_y.max(0), enemy_draw_width, enemy_draw_height);
-        frame.render_widget(Paragraph::new(enemy_text), enemy_area);
+        let enemy_area = ratatui::layout::Rect::new(
+            enemy_x.max(0) as u16,
+            enemy_y.max(0),
+            enemy_draw_width,
+            enemy_draw_height,
+        );
+        frame.render_widget(Paragraph::new(enemy_text.clone()), enemy_area);
 
-        let enemy_area = ratatui::layout::Rect::new(enemy_x.max(0) as u16, enemy_y.max(0), enemy_draw_width, enemy_draw_height);
+        let enemy_area = ratatui::layout::Rect::new(
+            enemy_x.max(0) as u16,
+            enemy_y.max(0),
+            enemy_draw_width,
+            enemy_draw_height,
+        );
         frame.render_widget(Paragraph::new(enemy_text), enemy_area);
     }
 }
@@ -165,7 +177,6 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         draw_enemy_ansi(frame);
         return;
     }
-
 
     frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
@@ -238,7 +249,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         (game_state.player.x as i32).saturating_sub(game_state.camera_x as i32);
     let player_y_on_screen =
         (game_state.player.y as i32).saturating_sub(game_state.camera_y as i32);
-    drawable_elements.push(( 
+    drawable_elements.push((
         player_y_on_screen + player_sprite_height as i32,
         1,
         player_sprite_content,
@@ -252,7 +263,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         if let Some(pending_sprite) = &game_state.pending_placed_sprite {
             let sprite_x_on_screen = pending_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = pending_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push(( 
+            drawable_elements.push((
                 sprite_y_on_screen + pending_sprite.height as i32,
                 0,
                 pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -268,7 +279,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         for placed_sprite in &current_map.placed_sprites {
             let sprite_x_on_screen = placed_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = placed_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push(( 
+            drawable_elements.push((
                 sprite_y_on_screen + placed_sprite.height as i32,
                 0,
                 placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -367,7 +378,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             let draw_y = min_y.saturating_sub(game_state.camera_y);
 
             let draw_rect = ratatui::layout::Rect::new(draw_x, draw_y, width, height);
-            let drawing_block = Block::default() 
+            let drawing_block = Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Rgb(255, 255, 0)));
             frame.render_widget(drawing_block, draw_rect);
@@ -382,7 +393,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
                 let draw_y = (y as u16).saturating_sub(game_state.camera_y);
 
                 if draw_x < size.width && draw_y < size.height {
-                    let wall_paragraph = Paragraph::new("W").style(Style::default().fg(Color::Rgb(255, 0, 0)));
+                    let wall_paragraph =
+                        Paragraph::new("W").style(Style::default().fg(Color::Rgb(255, 0, 0)));
                     let wall_rect = ratatui::layout::Rect::new(draw_x, draw_y, 1, 1);
                     frame.render_widget(wall_paragraph, wall_rect);
                 }
@@ -391,16 +403,28 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     if game_state.show_message {
-        let message_block = Block::default() 
+        let message_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(255, 255, 255)),
+            )
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .padding(ratatui::widgets::Padding::new(8, 8, 1, 1))
             .title("Message");
 
         let message_paragraph = Paragraph::new(game_state.animated_message_content.clone())
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .block(message_block);
 
         let message_height = 10;
@@ -440,13 +464,25 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(255, 255, 255)),
+            )
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title(title);
 
         let input_paragraph = Paragraph::new(game_state.text_input_buffer.clone())
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .block(input_block);
 
         let input_area_height = 3;
@@ -478,13 +514,25 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(255, 255, 255)),
+            )
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title("Enter Event");
 
         let input_paragraph = Paragraph::new(game_state.text_input_buffer.clone())
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .block(input_block);
 
         let input_area_height = 3;
@@ -516,8 +564,16 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let input_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
-            .border_style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(255, 255, 255)))
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(255, 255, 255)),
+            )
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .padding(ratatui::widgets::Padding::new(1, 1, 1, 1))
             .title("Select Map Kind");
 
@@ -529,7 +585,11 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .unwrap_or_else(|| "Unknown or deltarune".to_string());
 
         let input_paragraph = Paragraph::new(format!("Current: {}", current_map_kind))
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)))
+            .style(
+                Style::default()
+                    .fg(Color::Rgb(255, 255, 255))
+                    .bg(Color::Rgb(0, 0, 0)),
+            )
             .block(input_block);
 
         let input_area_height = 5;
@@ -585,8 +645,11 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let text_width = line1_width.max(line2_width).max(line3_width);
         let text_height = 3;
 
-        let paragraph = Paragraph::new(combined_text)
-            .style(Style::default().fg(Color::Rgb(255, 255, 255)).bg(Color::Rgb(0, 0, 0)));
+        let paragraph = Paragraph::new(combined_text).style(
+            Style::default()
+                .fg(Color::Rgb(255, 255, 255))
+                .bg(Color::Rgb(0, 0, 0)),
+        );
 
         let x = (size.width.saturating_sub(text_width)) / 2;
         let y = (size.height.saturating_sub(text_height)) / 2;
