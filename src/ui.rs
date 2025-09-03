@@ -15,7 +15,7 @@ fn draw_enemy_ansi(frame: &mut Frame) {
     let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
 
-    let ansi_content = std::fs::read_to_string("assets/sprites/enemy/not_a_placeholder/battle_3.ans").unwrap_or_else(|_| "Error reading file".to_string());
+        let ansi_content = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_3.ans")).unwrap_or_else(|_| "Error reading file".to_string());
     let enemy_text = ansi_content.as_bytes().into_text().unwrap();
     let enemy_height = enemy_text.lines.len() as u16;
     let mut enemy_width = 0;
@@ -41,36 +41,12 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
     if let Some(dialogue) = game_state.dialogue_manager.current_dialogue() {
         let size = frame.area();
 
-        // Draw enemy
-        let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
-        let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
-        let enemy_height = enemy_text.lines.len() as u16;
-        let mut enemy_width = 0;
-        for line in enemy_text.lines.iter() {
-            let line_width = line.width() as u16;
-            if line_width > enemy_width {
-                enemy_width = line_width;
-            }
-        }
-
-        let enemy_draw_width = enemy_width.min(size.width);
-        let enemy_draw_height = enemy_height.min(size.height);
-
-        let enemy_x = 5; // Positioned on the left
-        let enemy_y = size.height / 4 - enemy_draw_height / 2; // Keep it centered vertically in the top quarter
-
-        let enemy_area = ratatui::layout::Rect::new(enemy_x as u16, enemy_y, enemy_draw_width, enemy_draw_height);
-        frame.render_widget(Paragraph::new(enemy_text), enemy_area);
-
         // Draw dialogue box
-        let dialogue_box_height = 10; // Minimum height for the dialogue box
-        let remaining_height = size.height.saturating_sub(enemy_y + enemy_draw_height);
-        let dialogue_box_height = remaining_height.max(min_dialogue_box_height);
-
-        // Draw dialogue box (positioned below enemy ANSI, taking remaining height)
+        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 10; // Minimum height for the dialogue box
+        let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
         let dialogue_box_area = ratatui::layout::Rect::new(
             size.x + 10,
-            enemy_y + enemy_height + 2, // Positioned below enemy ANSI + some padding
+            size.height.saturating_sub(dialogue_box_height + 2), // Position at bottom with some padding
             size.width - 20,
             dialogue_box_height,
         );
@@ -100,6 +76,80 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), chunks[1]);
+
+        // Draw enemy
+        let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
+        let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
+        let enemy_height = enemy_text.lines.len() as u16;
+        let mut enemy_width = 0;
+        for line in enemy_text.lines.iter() {
+            let line_width = line.width() as u16;
+            if line_width > enemy_width {
+                enemy_width = line_width;
+            }
+        }
+
+        let enemy_draw_width = enemy_width.min(size.width);
+        let enemy_draw_height = enemy_height.min(size.height);
+
+        const MIN_DIALOGUE_BOX_HEIGHT: u16 = 10; // Minimum height for the dialogue box
+        let dialogue_box_height = (size.height / 3).max(MIN_DIALOGUE_BOX_HEIGHT); // Roughly bottom third
+        let dialogue_box_area = ratatui::layout::Rect::new(
+            size.x + 10,
+            size.height.saturating_sub(dialogue_box_height + 2), // Position at bottom with some padding
+            size.width - 20,
+            dialogue_box_height,
+        );
+        let dialogue_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Thick)
+            .border_style(Style::default().fg(Color::White)) // White border
+            .title("Dialogue");
+        frame.render_widget(dialogue_block.clone(), dialogue_box_area);
+
+        let inner_area = dialogue_box_area.inner(Margin { 
+            vertical: 1,
+            horizontal: 1,
+        });
+
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+            .split(inner_area);
+
+        // Draw animated text
+        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
+            .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(text_paragraph, chunks[0]);
+
+        // Draw face
+        let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
+        let face_text = face_ansi.as_bytes().into_text().unwrap();
+        frame.render_widget(Paragraph::new(face_text), chunks[1]);
+
+        // Draw enemy
+        let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
+        let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
+        let enemy_height = enemy_text.lines.len() as u16;
+        let mut enemy_width = 0;
+        for line in enemy_text.lines.iter() {
+            let line_width = line.width() as u16;
+            if line_width > enemy_width {
+                enemy_width = line_width;
+            }
+        }
+
+        let enemy_draw_width = enemy_width.min(size.width);
+        let enemy_draw_height = enemy_height.min(size.height);
+
+        let enemy_x = (size.width as i32 - enemy_draw_width as i32) / 2; // Center horizontally
+        let enemy_y = dialogue_box_area.y.saturating_sub(enemy_draw_height + 1); // Position above dialogue box
+
+        let enemy_area = ratatui::layout::Rect::new(enemy_x.max(0) as u16, enemy_y.max(0), enemy_draw_width, enemy_draw_height);
+        frame.render_widget(Paragraph::new(enemy_text), enemy_area);
+
+        let enemy_area = ratatui::layout::Rect::new(enemy_x.max(0) as u16, enemy_y.max(0), enemy_draw_width, enemy_draw_height);
+        frame.render_widget(Paragraph::new(enemy_text), enemy_area);
     }
 }
 

@@ -47,43 +47,48 @@ impl BattleState {
     pub fn new() -> Self {
         let dialogues = vec![
             Dialogue {
-                enemy_sprite_ansi: fs::read_to_string(
-                    "assets/sprites/enemy/not_a_placeholder/battle_neutral.ans",
+                                enemy_sprite_ansi: fs::read_to_string(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_neutral.ans"),
                 )
                 .unwrap_or_default(),
-                face_link: Some("assets/sprites/faces/face_neutral.ans".to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_neutral.ans").to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_neutral.ans").to_string()),
                 text: "Hello there, human. You've stumbled into my domain...".to_string(),
             },
             Dialogue {
-                enemy_sprite_ansi: fs::read_to_string(
-                    "assets/sprites/enemy/not_a_placeholder/battle_smile.ans",
+                                enemy_sprite_ansi: fs::read_to_string(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_smile.ans"),
                 )
                 .unwrap_or_default(),
-                face_link: Some("assets/sprites/faces/face_smile.ans".to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_smile.ans").to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_smile.ans").to_string()),
                 text: "Prepare for a dialogue-only encounter! Mwahaha!".to_string(),
             },
             Dialogue {
-                enemy_sprite_ansi: fs::read_to_string(
-                    "assets/sprites/enemy/not_a_placeholder/battle_hehehe.ans",
+                                enemy_sprite_ansi: fs::read_to_string(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_hehehe.ans"),
                 )
                 .unwrap_or_default(),
-                face_link: Some("assets/sprites/faces/face_hehehe.ans".to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_hehehe.ans").to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_hehehe.ans").to_string()),
                 text: "But seriously, this is just a test of the dialogue system...".to_string(),
             },
             Dialogue {
-                enemy_sprite_ansi: fs::read_to_string(
-                    "assets/sprites/enemy/not_a_placeholder/battle_more_neutral.ans",
+                                enemy_sprite_ansi: fs::read_to_string(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_more_neutral.ans"),
                 )
                 .unwrap_or_default(),
-                face_link: Some("assets/sprites/faces/face_determined.ans".to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_determined.ans").to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_determined.ans").to_string()),
                 text: "Press Enter to advance, or Esc/X to skip the current line.".to_string(),
             },
             Dialogue {
-                enemy_sprite_ansi: fs::read_to_string(
-                    "assets/sprites/enemy/not_a_placeholder/battle_3.ans",
+                                enemy_sprite_ansi: fs::read_to_string(
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/enemy/not_a_placeholder/battle_3.ans"),
                 )
                 .unwrap_or_default(),
-                face_link: Some("assets/sprites/faces/face_3.ans".to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_3.ans").to_string()),
+                face_link: Some(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/faces/face_3.ans").to_string()),
                 text: "Watch out for the pauses... like this, ... and this. And this.".to_string(),
             },
         ];

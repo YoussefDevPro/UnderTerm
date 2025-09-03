@@ -134,7 +134,7 @@ pub struct Map {
 
 impl Map {
     pub fn load(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(map_name);
+        let base_path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/map")).join(map_name);
 
         // load data
         let data_path = base_path.join("data.json");
@@ -191,7 +191,7 @@ impl Map {
     }
 
     pub fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let base_path = Path::new("/home/youssef/UnderTerm/assets/map").join(&self.name);
+        let base_path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/map")).join(&self.name);
         let data_path = base_path.join("data.json");
 
         let map_data = MapData {
@@ -220,7 +220,7 @@ impl Map {
     
 
     pub fn create_new(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = Path::new("assets/map").join(map_name);
+        let base_path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/map")).join(map_name);
         fs::create_dir_all(&base_path)?;
 
         let data_path = base_path.join("data.json");

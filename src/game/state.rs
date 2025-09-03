@@ -195,7 +195,7 @@ impl GameState {
             current_map_name: self.current_map_name.clone(),
         };
         let serialized = serde_json::to_string(&save_data)?;
-        std::fs::write("game_data.json", serialized)?;
+        std::fs::write(concat!(env!("CARGO_MANIFEST_DIR"), "/game_data.json"), serialized)?;
         Ok(())
     }
 
@@ -536,7 +536,7 @@ impl GameState {
                 if battle_zone.to_rect().intersects(player_collision_rect) {
                     self.is_flickering = true; // Start flickering
                     self.flicker_count = 10; // Reset flicker count
-                    audio.play_enemy_encounter_sound();
+                    // audio.play_enemy_encounter_sound();
                     
                 }
             }
