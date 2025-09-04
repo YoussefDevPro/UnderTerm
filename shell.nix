@@ -2,9 +2,10 @@
 
 let
   # Use the rust-overlay to get a specific Rust version with our needed targets
-  rust = pkgs.rust-bin.stable."1.76.0".default.override {
-    targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"];
-  };
+  rust = pkgs.rust-bin.stable."1.76.0".default.withTargets [
+    "x86_64-unknown-linux-musl"
+    "aarch64-unknown-linux-musl"
+  ];
 in
 pkgs.mkShell {
   # The build tools and libraries we need
