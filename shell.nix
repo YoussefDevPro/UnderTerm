@@ -1,8 +1,8 @@
-{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/23.11.tar.gz") { overlays = [ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]; } }:
+{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/24.05.tar.gz") { overlays = [ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]; } }:
 
 let
   # Use the rust-overlay to get a specific Rust version with our needed targets
-  rust = pkgs.rust-bin.stable."1.76.0".default.override {
+  rust = pkgs.rust-bin.stable."1.79.0".default.override {
     targets = [
       "x86_64-unknown-linux-musl"
       "aarch64-unknown-linux-musl"
