@@ -1,19 +1,25 @@
 { pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/24.05.tar.gz") { overlays = [ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]; } }:
 
 let
-  # Use the rust-overlay to get a specific Rust version with our needed targets
-  rust = pkgs.rust-bin.nightly."2024-07-15".default.override {
+  # Define the specific nightly toolchain we want to use
+  toolchain = pkgs.rust-bin.nightly."2024-07-15";
+
+  # Get the compiler from the toolchain and add our cross-compilation targets
+  rust = toolchain.default.override {
     targets = [
       "x86_64-unknown-linux-musl"
       "aarch64-unknown-linux-musl"
     ];
   };
+
+  # Get the matching source code from the same toolchain
+  rust_src = toolchain.rust-src;
 in
 pkgs.mkShell {
   # The build tools and libraries we need
   buildInputs = [
     rust
-    pkgs.rust-src
+    rust_src
     pkgs.pkg-config
     pkgs.alsa-lib
     pkgs.openssl # A common dependency, good to have
