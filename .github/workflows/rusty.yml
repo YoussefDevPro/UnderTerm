@@ -16,11 +16,11 @@ jobs:
         platform:
           - os-name: Linux-x86_64
             runs-on: ubuntu-24.04
-            target: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
 
           - os-name: Linux-aarch64
             runs-on: ubuntu-24.04
-            target: aarch64-unknown-linux-musl
+            target: aarch64-unknown-linux-gnu
 
           - os-name: Windows-x86_64
             runs-on: windows-latest
@@ -35,21 +35,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- Linux Build Steps using Nix ---
-      - name: Install Nix
-        if: runner.os == 'Linux'
-        uses: cachix/install-nix-action@v22
-        with:
-          nix_path: nixpkgs=channel:nixos-24.05
-
-      - name: Build with Nix
+      - name: Install ALSA dependencies for Linux
         if: runner.os == 'Linux'
         run: |
-          nix-shell --run "cargo build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release --target ${{ matrix.platform.target }} --bin under_term"
+          sudo apt-get update
+          if [ "${{ matrix.platform.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            sudo dpkg --add-architecture arm64
+            sudo apt-get update
+            sudo apt-get install -y libasound2-dev:arm64
+          else
+            sudo apt-get install -y libasound2-dev
+          fi
 
-      # --- Non-Linux Build Steps (Unchanged) ---
-      - name: Build binary (Windows/macOS)
-        if: runner.os != 'Linux'
+      - name: Build binary
         uses: houseabsolute/actions-rust-cross@v1
         with:
           command: build
@@ -57,9 +55,9 @@ jobs:
           args: "--release --bin under_term"
           strip: true
         env:
-          AWS_LC_SYS_CMAKE_BUILDER: 1
+          # Set PKG_CONFIG_PATH for the aarch64 cross-compilation so it can find the ALSA library.
+          PKG_CONFIG_PATH: ${{ matrix.platform.target == 'aarch64-unknown-linux-gnu' && '/usr/lib/aarch64-linux-gnu/pkgconfig' || '' }}
 
-      # This step remains the same for all platforms
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
         with:
