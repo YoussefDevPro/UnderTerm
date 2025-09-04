@@ -38,14 +38,39 @@ jobs:
       - name: Install ALSA dependencies for Linux
         if: runner.os == 'Linux'
         run: |
+          # Use Deb822 format to define multi-architecture sources
+          cat <<EOF | sudo tee /etc/apt/sources.list.d/multiarch.sources
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Architectures: amd64
+
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Architectures: amd64
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Architectures: arm64
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Architectures: arm64
+          EOF
+
+          # Add the arm64 architecture and update
+          sudo dpkg --add-architecture arm64
           sudo apt-get update
+
+          # Install the correct package for the target architecture
           if [ "${{ matrix.platform.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            sudo dpkg --add-architecture arm64
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/ubuntu-ports.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports.list
-            sudo apt-get update
             sudo apt-get install -y libasound2-dev:arm64 pkg-config
           else
             sudo apt-get install -y libasound2-dev pkg-config
