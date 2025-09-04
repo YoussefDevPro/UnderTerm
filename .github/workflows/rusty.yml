@@ -35,28 +35,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install ALSA dependencies for Linux
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          if [ "${{ matrix.platform.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            sudo dpkg --add-architecture arm64
-            sudo apt-get update
-            sudo apt-get install -y libasound2-dev:arm64
-          else
-            sudo apt-get install -y libasound2-dev
-          fi
-
-      - name: Build binary
+      - name: Build binary (Linux x86_64)
+        if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
         uses: houseabsolute/actions-rust-cross@v1
         with:
           command: build
           target: ${{ matrix.platform.target }}
           args: "--release --bin under_term"
           strip: true
+          install_packages: libasound2-dev
+
+      - name: Build binary (Linux aarch64)
+        if: matrix.platform.target == 'aarch64-unknown-linux-gnu'
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.platform.target }}
+          args: "--release --bin under_term"
+          strip: true
+          install_packages: libasound2-dev:arm64
         env:
-          # Set PKG_CONFIG_PATH for the aarch64 cross-compilation so it can find the ALSA library.
-          PKG_CONFIG_PATH: ${{ matrix.platform.target == 'aarch64-unknown-linux-gnu' && '/usr/lib/aarch64-linux-gnu/pkgconfig' || '' }}
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
+
+      - name: Build binary (Windows/macOS)
+        if: runner.os != 'Linux'
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.platform.target }}
+          args: "--release --bin under_term"
+          strip: true
 
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
