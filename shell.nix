@@ -32,6 +32,8 @@ pkgs.mkShell {
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "musl-gcc";
 
   # Crucially, set the pkg-config path inside the Nix shell.
-  # This was the step that was failing in all previous attempts.
   PKG_CONFIG_PATH = "${pkgs.alsa-lib}/lib/pkgconfig";
+
+  # Set the path to the Rust standard library source code, needed for -Z build-std
+  RUST_SRC_PATH = "${rust_src}/lib/rustlib/src/rust";
 }
