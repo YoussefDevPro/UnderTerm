@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use crate::load_map_asset_str;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlacedSprite {
@@ -134,16 +135,16 @@ pub struct Map {
 
 impl Map {
     pub fn load(map_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/map")).join(map_name);
+        let data_content = load_map_asset_str!(map_name, "data.json");
+        if data_content.is_empty() {
+            return Err(format!("Map data for {} not found", map_name).into());
+        }
+        let map_data: MapData = serde_json::from_str(data_content)?;
 
-        // load data
-        let data_path = base_path.join("data.json");
-        let data_content = fs::read_to_string(&data_path)?;
-        let map_data: MapData = serde_json::from_str(&data_content)?;
-
-        // lood sprite
-        let sprite_path = base_path.join("sprite.ans");
-        let ansi_sprite = fs::read_to_string(&sprite_path)?;
+        let ansi_sprite = load_map_asset_str!(map_name, "sprite.ans");
+        if ansi_sprite.is_empty() {
+            return Err(format!("Map sprite for {} not found", map_name).into());
+        }
 
         // map dimension
         let map_text_for_dimensions = ansi_sprite.as_bytes().into_text().unwrap();
@@ -168,7 +169,7 @@ impl Map {
 
         Ok(Map {
             name: map_data.map_name,
-            ansi_sprite,
+            ansi_sprite: ansi_sprite.to_string(),
             walls: map_data.walls,
             player_spawn: map_data.player_spawn,
             select_object_boxes: map_data.select_object_boxes,

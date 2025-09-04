@@ -1,6 +1,5 @@
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Source};
-use std::fs::File;
-use std::io::BufReader;
+use std::io::Cursor;
 
 pub struct Audio {
     _stream: OutputStream,
@@ -19,20 +18,16 @@ impl Audio {
     }
 
     pub fn play_open_settings_sound(&self) {
-        let file = File::open(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/assets/sound/open_settings.mp3"
-        ))
-        .unwrap();
-        let decoder = Decoder::new(BufReader::new(file)).unwrap();
+        let bytes = include_bytes!("../../assets/sound/open_settings.mp3");
+        let decoder = Decoder::new(Cursor::new(&bytes[..])).unwrap();
         self.stream_handle
             .play_raw(decoder.convert_samples())
             .unwrap();
     }
 
     pub fn play_text_sound(&mut self) {
-        let file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sound/A.mp3")).unwrap();
-        let decoder = Decoder::new(BufReader::new(file)).unwrap();
+        let bytes = include_bytes!("../../assets/sound/A.mp3");
+        let decoder = Decoder::new(Cursor::new(&bytes[..])).unwrap();
         let sink = rodio::Sink::try_new(&self.stream_handle).unwrap();
         sink.set_volume(4.0);
         sink.append(decoder.convert_samples::<f32>());
@@ -40,14 +35,11 @@ impl Audio {
     }
 
     pub fn play_enemy_encounter_sound(&self) {
-        let file = File::open(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/assets/sound/enemy_encounter.mp3"
-        ))
-        .unwrap();
-        let decoder = Decoder::new(BufReader::new(file)).unwrap();
+        let bytes = include_bytes!("../../assets/sound/enemy_encounter.mp3");
+        let decoder = Decoder::new(Cursor::new(&bytes[..])).unwrap();
         self.stream_handle
             .play_raw(decoder.convert_samples())
             .unwrap();
     }
 }
+

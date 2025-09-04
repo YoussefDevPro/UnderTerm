@@ -2,9 +2,10 @@ use crate::debug;
 use crate::game::state::{GameState, TeleportCreationState};
 use ansi_to_tui::IntoText;
 use ratatui::prelude::Text;
+use crate::load_sprite_asset_str;
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Margin},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame,
@@ -15,11 +16,7 @@ fn draw_enemy_ansi(frame: &mut Frame) {
     let background = Block::default().bg(Color::Rgb(0, 0, 0));
     frame.render_widget(background, size);
 
-    let ansi_content = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/assets/sprites/enemy/not_a_placeholder/battle_3.ans"
-    ))
-    .unwrap_or_else(|_| "Error reading file".to_string());
+    let ansi_content = include_str!("../assets/sprites/enemy/not_a_placeholder/battle_3.ans");
     let enemy_text = ansi_content.as_bytes().into_text().unwrap();
     let enemy_height = enemy_text.lines.len() as u16;
     let mut enemy_width = 0;
@@ -47,7 +44,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let size = frame.area();
         frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
-        let enemy_ansi = std::fs::read_to_string(&dialogue.enemy_ansi_path).unwrap_or_default();
+        let enemy_ansi = load_sprite_asset_str!(dialogue.enemy_ansi_path.as_str());
         let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
         let enemy_height = enemy_text.lines.len() as u16;
         let mut enemy_width = 0;
@@ -111,7 +108,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let text_height = dialogue_box_area.height.saturating_sub(4);
         let text_area = ratatui::layout::Rect::new(text_x, text_y, text_width, text_height);
 
-        let face_ansi = std::fs::read_to_string(&dialogue.face_ansi_path).unwrap_or_default();
+        let face_ansi = load_sprite_asset_str!(dialogue.face_ansi_path.as_str());
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), face_area);
 
@@ -205,7 +202,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         (game_state.player.x as i32).saturating_sub(game_state.camera_x as i32);
     let player_y_on_screen =
         (game_state.player.y as i32).saturating_sub(game_state.camera_y as i32);
-    drawable_elements.push((
+    drawable_elements.push(( 
         player_y_on_screen + player_sprite_height as i32,
         1,
         player_sprite_content,
@@ -219,7 +216,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         if let Some(pending_sprite) = &game_state.pending_placed_sprite {
             let sprite_x_on_screen = pending_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = pending_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push((
+            drawable_elements.push(( 
                 sprite_y_on_screen + pending_sprite.height as i32,
                 0,
                 pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -235,7 +232,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         for placed_sprite in &current_map.placed_sprites {
             let sprite_x_on_screen = placed_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = placed_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push((
+            drawable_elements.push(( 
                 sprite_y_on_screen + placed_sprite.height as i32,
                 0,
                 placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -359,7 +356,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     if game_state.show_message {
-        let message_block = Block::default()
+        let message_block = Block::default() 
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
             .border_style(

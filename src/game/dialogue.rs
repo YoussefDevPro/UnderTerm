@@ -25,8 +25,8 @@ impl DialogueManager {
     }
 
     fn load_dialogues() -> Result<Vec<Dialogue>, Box<dyn std::error::Error>> {
-                let dialogues_content = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/dialogues.json"))?;
-        let dialogues: Vec<Dialogue> = serde_json::from_str(&dialogues_content)?;
+        let dialogues_content = include_str!("../../dialogues.json");
+        let dialogues: Vec<Dialogue> = serde_json::from_str(dialogues_content)?;
         Ok(dialogues)
     }
 

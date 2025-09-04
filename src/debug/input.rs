@@ -84,9 +84,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
         KeyCode::Char('x') => {
             if !game_state.is_placing_sprite {
                 game_state.is_placing_sprite = true;
-                                let sprite_content = std::fs::read_to_string(
-                    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/ME/idle/default.ans"),
-                ).unwrap_or_else(|_| "X".to_string());
+                let sprite_content = include_str!("../../assets/sprites/ME/idle/default.ans");
                 let text = sprite_content.as_bytes().into_text().unwrap();
                 let height = text.lines.len() as u32;
                 let mut width = 0;
@@ -103,7 +101,7 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
                     y: game_state.player.y as u32,
                     width,
                     height,
-                    ansi_content: sprite_content,
+                    ansi_content: sprite_content.to_string(),
                 };
                 game_state.pending_placed_sprite = Some(new_placed_sprite);
                 game_state.message =

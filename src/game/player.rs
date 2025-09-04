@@ -80,8 +80,7 @@ impl Player {
     }
 
     pub fn get_sprite_content(&self) -> (Text<'static>, u16, u16) {
-        let sprite_path = self.get_sprite_path();
-        let content = std::fs::read_to_string(&sprite_path).unwrap_or_else(|_| "P".to_string());
+        let content = self.get_sprite_content_from_binary();
         let text = content.as_bytes().into_text().unwrap();
 
         let height = text.lines.len() as u16;
@@ -95,59 +94,57 @@ impl Player {
         (text, max_width, height)
     }
 
-    pub fn get_sprite_path(&self) -> String {
-        let base_path = "assets/sprites/frisk/";
-        let (sub_dir, anim_file) = match self.direction {
+    pub fn get_sprite_content_from_binary(&self) -> &'static str {
+        match self.direction {
             PlayerDirection::Front => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("idle", "frisk_idle_front.ans"),
-                        1 => ("walk", "frisk_walk_front_1.ans"),
-                        2 => ("idle", "frisk_idle_front.ans"),
-                        3 => ("walk", "frisk_walk_front_2.ans"),
-                        _ => ("idle", "frisk_idle_front.ans"),
+                        0 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_front.ans")),
+                        1 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_front_1.ans")),
+                        2 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_front.ans")),
+                        3 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_front_2.ans")),
+                        _ => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_front.ans")),
                     }
                 } else {
-                    ("idle", "frisk_idle_front.ans")
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_front.ans"))
                 }
             }
             PlayerDirection::Back => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("idle", "frisk_idle_back.ans"),
-                        1 => ("walk", "frisk_walk_back_1.ans"),
-                        2 => ("idle", "frisk_idle_back.ans"),
-                        3 => ("walk", "frisk_walk_back_2.ans"),
-                        _ => ("idle", "frisk_idle_back.ans"),
+                        0 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_back.ans")),
+                        1 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_back_1.ans")),
+                        2 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_back.ans")),
+                        3 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_back_2.ans")),
+                        _ => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_back.ans")),
                     }
                 } else {
-                    ("idle", "frisk_idle_back.ans")
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_back.ans"))
                 }
             }
             PlayerDirection::Left | PlayerDirection::FrontLeft | PlayerDirection::BackLeft => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("idle", "frisk_idle_left.ans"),
-                        1 => ("walk", "frisk_walk_left.ans"),
-                        _ => ("idle", "frisk_idle_left.ans"),
+                        0 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_left.ans")),
+                        1 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_left.ans")),
+                        _ => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_left.ans")),
                     }
                 } else {
-                    ("idle", "frisk_idle_left.ans")
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_left.ans"))
                 }
             }
             PlayerDirection::Right | PlayerDirection::FrontRight | PlayerDirection::BackRight => {
                 if self.is_walking {
                     match self.animation_frame {
-                        0 => ("idle", "frisk_idle_right.ans"),
-                        1 => ("walk", "frisk_walk_right.ans"),
-                        _ => ("idle", "frisk_idle_right.ans"),
+                        0 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_right.ans")),
+                        1 => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/walk/frisk_walk_right.ans")),
+                        _ => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_right.ans")),
                     }
                 } else {
-                    ("idle", "frisk_idle_right.ans")
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_right.ans"))
                 }
             }
-        };
-        format!("{}{}/{}", base_path, sub_dir, anim_file)
+        }
     }
 
     pub fn update_animation(&mut self, animation_frame_duration: Duration) {

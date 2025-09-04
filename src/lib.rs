@@ -4,3 +4,4 @@ pub mod game;
 pub mod game_loop;
 pub mod input;
 pub mod ui;
+pub mod assets;
