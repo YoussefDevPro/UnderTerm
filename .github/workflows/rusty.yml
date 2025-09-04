@@ -14,19 +14,15 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os-name: Linux-x86_64
+          - os-name: Linux
             runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
 
-          - os-name: Linux-aarch64
-            runs-on: ubuntu-24.04
-            target: aarch64-unknown-linux-gnu
-
-          - os-name: Windows-x86_64
+          - os-name: Windows
             runs-on: windows-latest
             target: x86_64-pc-windows-msvc
 
-          - os-name: macOS-x86_64
+          - os-name: macOS
             runs-on: macOS-latest
             target: x86_64-apple-darwin
 
@@ -35,46 +31,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install ALSA dependencies for Linux
+      - name: Install ALSA dependencies (Linux)
         if: runner.os == 'Linux'
-        run: |
-          # Use Deb822 format to define multi-architecture sources
-          cat <<EOF | sudo tee /etc/apt/sources.list.d/multiarch.sources
-          Types: deb
-          URIs: http://archive.ubuntu.com/ubuntu/
-          Suites: noble noble-updates noble-backports
-          Components: main restricted universe multiverse
-          Architectures: amd64
-
-          Types: deb
-          URIs: http://security.ubuntu.com/ubuntu/
-          Suites: noble-security
-          Components: main restricted universe multiverse
-          Architectures: amd64
-
-          Types: deb
-          URIs: http://ports.ubuntu.com/ubuntu-ports
-          Suites: noble noble-updates noble-backports
-          Components: main restricted universe multiverse
-          Architectures: arm64
-
-          Types: deb
-          URIs: http://ports.ubuntu.com/ubuntu-ports
-          Suites: noble-security
-          Components: main restricted universe multiverse
-          Architectures: arm64
-          EOF
-
-          # Add the arm64 architecture and update
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-
-          # Install the correct package for the target architecture
-          if [ "${{ matrix.platform.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            sudo apt-get install -y libasound2-dev:arm64 pkg-config
-          else
-            sudo apt-get install -y libasound2-dev pkg-config
-          fi
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v1
@@ -83,8 +42,6 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--release --bin under_term"
           strip: true
-        env:
-          PKG_CONFIG_PATH: ${{ matrix.platform.target == 'aarch64-unknown-linux-gnu' && '/usr/lib/aarch64-linux-gnu/pkgconfig' || '' }}
 
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
