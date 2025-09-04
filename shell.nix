@@ -13,6 +13,7 @@ pkgs.mkShell {
   # The build tools and libraries we need
   buildInputs = [
     rust
+    pkgs.rust-src
     pkgs.pkg-config
     pkgs.alsa-lib
     pkgs.openssl # A common dependency, good to have
