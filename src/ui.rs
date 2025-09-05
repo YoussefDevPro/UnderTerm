@@ -120,24 +120,15 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             .take(game_state.dialogue_manager.visible_text_len)
             .collect::<String>();
 
-        let font_content = include_str!("../assets/fonts/miniwi.flf");
-        match FIGfont::from_content(font_content) {
-            Ok(font) => {
-                if let Some(fig_text) = font.convert(&visible_text) {
-                    let text_paragraph = Paragraph::new(fig_text.to_string())
-                        .wrap(ratatui::widgets::Wrap { trim: true });
-                    frame.render_widget(text_paragraph, text_area);
-                } else {
-                    let text_paragraph = Paragraph::new("FIGLET CONVERSION FAILED")
-                        .wrap(ratatui::widgets::Wrap { trim: true });
-                    frame.render_widget(text_paragraph, text_area);
-                }
-            }
-            Err(e) => {
-                let text_paragraph =
-                    Paragraph::new(format!("FONT ERR: {}", e)).wrap(ratatui::widgets::Wrap { trim: true });
-                frame.render_widget(text_paragraph, text_area);
-            }
+        let font = FIGfont::from_file("assets/fonts/toilet_fonts/miniwi.flf").unwrap();
+        if let Some(fig_text) = font.convert(&visible_text) {
+            let text_paragraph = Paragraph::new(fig_text.to_string())
+                .wrap(ratatui::widgets::Wrap { trim: true });
+            frame.render_widget(text_paragraph, text_area);
+        } else {
+            let text_paragraph = Paragraph::new("FIGLET CONVERSION FAILED")
+                .wrap(ratatui::widgets::Wrap { trim: true });
+            frame.render_widget(text_paragraph, text_area);
         }
     }
 }
