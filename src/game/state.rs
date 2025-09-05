@@ -254,13 +254,9 @@ impl GameState {
                     if self.message_animation_start_time.elapsed()
                         >= self.message_animation_interval
                     {
-                        let current_len = self.dialogue_manager.animated_text.chars().count();
+                        let current_len = self.dialogue_manager.visible_text_len;
                         if current_len < dialogue.text.chars().count() {
-                            let next_char_index =
-                                self.dialogue_manager.animated_text.chars().count();
-                            self.dialogue_manager
-                                .animated_text
-                                .push(dialogue.text.chars().nth(next_char_index).unwrap());
+                            self.dialogue_manager.visible_text_len += 1;
                             audio.play_text_sound();
                             self.message_animation_start_time = Instant::now();
                         } else {

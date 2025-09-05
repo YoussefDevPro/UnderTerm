@@ -13,6 +13,7 @@ pub struct DialogueManager {
     pub current_dialogue_index: usize,
     pub animated_text: String,
     pub text_animation_finished: bool,
+    pub visible_text_len: usize,
 }
 
 impl DialogueManager {
@@ -39,6 +40,7 @@ impl DialogueManager {
             self.current_dialogue_index += 1;
             self.animated_text.clear();
             self.text_animation_finished = false;
+            self.visible_text_len = 0;
         } else {
             // No more dialogues
         }

@@ -1,14 +1,16 @@
 use crate::debug;
 use crate::game::state::{GameState, TeleportCreationState};
-use ansi_to_tui::IntoText;
-use ratatui::prelude::Text;
 use crate::load_sprite_asset_str;
+use ansi_to_tui::IntoText;
+use figlet_rs::FIGfont;
+use ratatui::prelude::Text;
+
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
-    Frame,
 };
 
 fn draw_enemy_ansi(frame: &mut Frame) {
@@ -112,9 +114,31 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), face_area);
 
-        let text_paragraph = Paragraph::new(game_state.dialogue_manager.animated_text.clone())
-            .wrap(ratatui::widgets::Wrap { trim: true });
-        frame.render_widget(text_paragraph, text_area);
+        let visible_text = dialogue
+            .text
+            .chars()
+            .take(game_state.dialogue_manager.visible_text_len)
+            .collect::<String>();
+
+        let font_content = include_str!("../assets/fonts/miniwi.flf");
+        match FIGfont::from_content(font_content) {
+            Ok(font) => {
+                if let Some(fig_text) = font.convert(&visible_text) {
+                    let text_paragraph = Paragraph::new(fig_text.to_string())
+                        .wrap(ratatui::widgets::Wrap { trim: true });
+                    frame.render_widget(text_paragraph, text_area);
+                } else {
+                    let text_paragraph = Paragraph::new("FIGLET CONVERSION FAILED")
+                        .wrap(ratatui::widgets::Wrap { trim: true });
+                    frame.render_widget(text_paragraph, text_area);
+                }
+            }
+            Err(e) => {
+                let text_paragraph =
+                    Paragraph::new(format!("FONT ERR: {}", e)).wrap(ratatui::widgets::Wrap { trim: true });
+                frame.render_widget(text_paragraph, text_area);
+            }
+        }
     }
 }
 
@@ -202,7 +226,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         (game_state.player.x as i32).saturating_sub(game_state.camera_x as i32);
     let player_y_on_screen =
         (game_state.player.y as i32).saturating_sub(game_state.camera_y as i32);
-    drawable_elements.push(( 
+    drawable_elements.push((
         player_y_on_screen + player_sprite_height as i32,
         1,
         player_sprite_content,
@@ -216,7 +240,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         if let Some(pending_sprite) = &game_state.pending_placed_sprite {
             let sprite_x_on_screen = pending_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = pending_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push(( 
+            drawable_elements.push((
                 sprite_y_on_screen + pending_sprite.height as i32,
                 0,
                 pending_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -232,7 +256,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         for placed_sprite in &current_map.placed_sprites {
             let sprite_x_on_screen = placed_sprite.x as i32 - game_state.camera_x as i32;
             let sprite_y_on_screen = placed_sprite.y as i32 - game_state.camera_y as i32;
-            drawable_elements.push(( 
+            drawable_elements.push((
                 sprite_y_on_screen + placed_sprite.height as i32,
                 0,
                 placed_sprite.ansi_content.as_bytes().into_text().unwrap(),
@@ -356,7 +380,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     if game_state.show_message {
-        let message_block = Block::default() 
+        let message_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
             .border_style(
