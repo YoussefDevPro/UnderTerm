@@ -1,16 +1,16 @@
 use crate::debug;
 use crate::game::state::{GameState, TeleportCreationState};
+use crate::game::utils::wrap_text_to_width;
 use crate::load_sprite_asset_str;
 use ansi_to_tui::IntoText;
 use figlet_rs::FIGfont;
 use ratatui::prelude::Text;
 
-
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
+    Frame,
 };
 
 fn draw_enemy_ansi(frame: &mut Frame) {
@@ -114,21 +114,49 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let face_text = face_ansi.as_bytes().into_text().unwrap();
         frame.render_widget(Paragraph::new(face_text), face_area);
 
-        let visible_text = dialogue
-            .text
-            .chars()
-            .take(game_state.dialogue_manager.visible_text_len)
-            .collect::<String>();
+        let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
 
-        let font = FIGfont::from_file("assets/fonts/toilet_fonts/miniwi.flf").unwrap();
-        if let Some(fig_text) = font.convert(&visible_text) {
-            let text_paragraph = Paragraph::new(fig_text.to_string())
-                .wrap(ratatui::widgets::Wrap { trim: true });
-            frame.render_widget(text_paragraph, text_area);
+        let text_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(text_area);
+
+        let top_text_area = text_chunks[0];
+        let bottom_text_area = text_chunks[1];
+
+        let estimated_width = dialogue.text.chars().count() * 3;
+
+        if estimated_width as u16 > top_text_area.width {
+            // Text is too big, split it
+            let words: Vec<&str> = dialogue.text.split_whitespace().collect();
+            let mid_point = (words.len() / 2) as usize;
+            let top_text = words[..mid_point].join(" ");
+            let bottom_text = words[mid_point..].join(" ");
+
+            let wrapped_top_text = wrap_text_to_width(&top_text, top_text_area.width);
+            if let Some(fig_text_top) = font.convert(&wrapped_top_text) {
+                let text_paragraph =
+                    Paragraph::new(fig_text_top.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
+                frame.render_widget(text_paragraph, top_text_area);
+            }
+
+            let wrapped_bottom_text = wrap_text_to_width(&bottom_text, bottom_text_area.width);
+            if let Some(fig_text_bottom) = font.convert(&wrapped_bottom_text) {
+                let text_paragraph =
+                    Paragraph::new(fig_text_bottom.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
+                frame.render_widget(text_paragraph, bottom_text_area);
+            }
         } else {
-            let text_paragraph = Paragraph::new("FIGLET CONVERSION FAILED")
-                .wrap(ratatui::widgets::Wrap { trim: true });
-            frame.render_widget(text_paragraph, text_area);
+            // Text fits, render it in the top area
+            let wrapped_text = wrap_text_to_width(&dialogue.text, top_text_area.width);
+            if let Some(fig_text) = font.convert(&wrapped_text) {
+                let text_paragraph =
+                    Paragraph::new(fig_text.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
+                frame.render_widget(text_paragraph, top_text_area);
+            }
         }
     }
 }
