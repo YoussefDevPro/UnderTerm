@@ -116,46 +116,66 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
 
         let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
 
+        fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
+            if let Some(fig_text) = font.convert(text) {
+                let mut fig_text_str = fig_text.to_string();
+                if text.trim_start().starts_with('t') || text.trim_start().starts_with('T') {
+                    let mut lines: Vec<String> =
+                        fig_text_str.lines().map(|l| l.to_string()).collect();
+                    if lines.len() >= 3 {
+                        lines[1] = format!(" {}", lines[1]);
+                        lines[2] = format!(" {}", lines[2]);
+                    }
+                    fig_text_str = lines.join("\n");
+                }
+                fig_text_str
+            } else {
+                "FIGLET CONVERSION FAILED".to_string()
+            }
+        }
+
+        let mut chunks = Vec::new();
+        let mut remaining_text = dialogue.text.as_str();
+
+        while !remaining_text.is_empty() {
+            let mut best_split = remaining_text.len();
+            let mut current_width = 0;
+            let mut last_space = 0;
+
+            for (i, c) in remaining_text.char_indices() {
+                if c.is_whitespace() {
+                    last_space = i;
+                }
+                current_width += 3; // estimated width
+                if current_width > 130 {
+                    if last_space > 0 {
+                        best_split = last_space;
+                    } else {
+                        best_split = i;
+                    }
+                    break;
+                }
+            }
+            let (chunk, rest) = remaining_text.split_at(best_split);
+            chunks.push(chunk.to_string());
+            remaining_text = rest.trim_start();
+        }
+
+        let num_chunks = chunks.len();
+        let constraints: Vec<Constraint> = (0..num_chunks).map(|_| Constraint::Length(3)).collect();
         let text_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
+            .constraints(constraints)
+            .spacing(1)
             .split(text_area);
 
-        let top_text_area = text_chunks[0];
-        let bottom_text_area = text_chunks[1];
-
-        let estimated_width = dialogue.text.chars().count() * 3;
-
-        if estimated_width as u16 > top_text_area.width {
-            // Text is too big, split it
-            let words: Vec<&str> = dialogue.text.split_whitespace().collect();
-            let mid_point = (words.len() / 2) as usize;
-            let top_text = words[..mid_point].join(" ");
-            let bottom_text = words[mid_point..].join(" ");
-
-            let wrapped_top_text = wrap_text_to_width(&top_text, top_text_area.width);
-            if let Some(fig_text_top) = font.convert(&wrapped_top_text) {
+        for (i, chunk) in chunks.iter().enumerate() {
+            if i < text_chunks.len() {
+                let wrapped_text = wrap_text_to_width(chunk, text_chunks[i].width);
+                let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
                 let text_paragraph =
-                    Paragraph::new(fig_text_top.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
-                frame.render_widget(text_paragraph, top_text_area);
-            }
-
-            let wrapped_bottom_text = wrap_text_to_width(&bottom_text, bottom_text_area.width);
-            if let Some(fig_text_bottom) = font.convert(&wrapped_bottom_text) {
-                let text_paragraph =
-                    Paragraph::new(fig_text_bottom.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
-                frame.render_widget(text_paragraph, bottom_text_area);
-            }
-        } else {
-            // Text fits, render it in the top area
-            let wrapped_text = wrap_text_to_width(&dialogue.text, top_text_area.width);
-            if let Some(fig_text) = font.convert(&wrapped_text) {
-                let text_paragraph =
-                    Paragraph::new(fig_text.to_string()).wrap(ratatui::widgets::Wrap { trim: true });
-                frame.render_widget(text_paragraph, top_text_area);
+                    Paragraph::new(fig_text_str).wrap(ratatui::widgets::Wrap { trim: true });
+                frame.render_widget(text_paragraph, text_chunks[i]);
             }
         }
     }
