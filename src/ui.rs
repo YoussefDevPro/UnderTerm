@@ -135,7 +135,12 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         }
 
         let mut chunks = Vec::new();
-        let mut remaining_text = dialogue.text.as_str();
+        let visible_text = dialogue
+            .text
+            .chars()
+            .take(game_state.dialogue_manager.visible_text_len)
+            .collect::<String>();
+        let mut remaining_text = visible_text.as_str();
 
         while !remaining_text.is_empty() {
             let mut best_split = remaining_text.len();

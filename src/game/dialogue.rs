@@ -48,7 +48,7 @@ impl DialogueManager {
 
     pub fn skip_animation(&mut self) {
         if let Some(dialogue) = self.current_dialogue() {
-            self.animated_text = dialogue.text.clone();
+            self.visible_text_len = dialogue.text.chars().count();
             self.text_animation_finished = true;
         }
     }
