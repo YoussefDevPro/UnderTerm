@@ -8,10 +8,28 @@ use ratatui::prelude::Text;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style, Stylize},
+    style::{Color, Modifier, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame,
 };
+
+fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
+    if let Some(fig_text) = font.convert(text) {
+        let mut fig_text_str = fig_text.to_string();
+        if text.trim_start().starts_with('t') || text.trim_start().starts_with('T') {
+            let mut lines: Vec<String> =
+                fig_text_str.lines().map(|l| l.to_string()).collect();
+            if lines.len() >= 3 {
+                lines[1] = format!(" {}", lines[1]);
+                lines[2] = format!(" {}", lines[2]);
+            }
+            fig_text_str = lines.join("\n");
+        }
+        fig_text_str
+    } else {
+        "FIGLET CONVERSION FAILED".to_string()
+    }
+}
 
 fn draw_enemy_ansi(frame: &mut Frame) {
     let size = frame.area();
@@ -112,7 +130,10 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
 
         let face_ansi = load_sprite_asset_str!(dialogue.face_ansi_path.as_str());
         let face_text = face_ansi.as_bytes().into_text().unwrap();
-        frame.render_widget(Paragraph::new(face_text), face_area);
+        frame.render_widget(
+            Paragraph::new(face_text).style(Style::default().add_modifier(Modifier::BOLD)),
+            face_area,
+        );
 
         let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
 
@@ -178,8 +199,9 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             if i < text_chunks.len() {
                 let wrapped_text = wrap_text_to_width(chunk, text_chunks[i].width);
                 let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
-                let text_paragraph =
-                    Paragraph::new(fig_text_str).wrap(ratatui::widgets::Wrap { trim: true });
+                let text_paragraph = Paragraph::new(fig_text_str)
+                    .wrap(ratatui::widgets::Wrap { trim: true })
+                    .style(Style::default().add_modifier(Modifier::BOLD));
                 frame.render_widget(text_paragraph, text_chunks[i]);
             }
         }
@@ -440,11 +462,14 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .padding(ratatui::widgets::Padding::new(8, 8, 1, 1))
             .title("Message");
 
-        let message_paragraph = Paragraph::new(game_state.animated_message_content.clone())
+        let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
+        let ascii_art = convert_and_fix_t(&font, &game_state.animated_message_content);
+        let message_paragraph = Paragraph::new(ascii_art)
             .style(
                 Style::default()
                     .fg(Color::Rgb(255, 255, 255))
-                    .bg(Color::Rgb(0, 0, 0)),
+                    .bg(Color::Rgb(0, 0, 0))
+                    .add_modifier(Modifier::BOLD),
             )
             .block(message_block);
 
