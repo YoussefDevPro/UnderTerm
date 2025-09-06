@@ -35,14 +35,17 @@ impl DialogueManager {
         self.dialogues.get(self.current_dialogue_index)
     }
 
-    pub fn advance_dialogue(&mut self) {
+    pub fn advance_dialogue(&mut self) -> bool {
         if self.current_dialogue_index < self.dialogues.len() - 1 {
             self.current_dialogue_index += 1;
             self.animated_text.clear();
             self.text_animation_finished = false;
             self.visible_text_len = 0;
+            false
         } else {
-            // No more dialogues
+            // No more dialogues, signal game state to change
+            // This will be handled in the main game loop update
+            true
         }
     }
 

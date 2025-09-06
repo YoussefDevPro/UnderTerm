@@ -28,10 +28,21 @@ pub fn process_events(
 ) -> io::Result<bool> {
     while let Ok(event) = rx.try_recv() {
         if let Event::Key(key) = event {
+            if game_state.teleport_state == crate::game::state::TeleportState::ThankYouScreen {
+                if key.kind == event::KeyEventKind::Press {
+                    return Ok(true); // Exit game on any key press on thank you screen
+                }
+                continue;
+            }
+
             if game_state.dialogue_active {
                 if key.code == KeyCode::Enter && key.kind == event::KeyEventKind::Press {
                     if game_state.dialogue_manager.text_animation_finished {
-                        game_state.dialogue_manager.advance_dialogue();
+                        let is_last_dialogue = game_state.dialogue_manager.advance_dialogue();
+                        if is_last_dialogue {
+                            game_state.deltarune.level = 100; // Immediately make screen black
+                            game_state.dialogue_active = false; // Exit dialogue mode
+                        }
                     } else {
                         game_state.dialogue_manager.skip_animation();
                     }

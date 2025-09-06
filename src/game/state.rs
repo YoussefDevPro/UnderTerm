@@ -32,6 +32,7 @@ pub enum TeleportState {
     None,
     FadingOut,
     FadingIn,
+    ThankYouScreen,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,12 +272,8 @@ impl GameState {
                     }
                 }
             } else {
-                // No more dialogues, transition to dark screen
-                self.dialogue_active = false;
-                self.deltarune.level = 0; // Reset darkness
-                                          // Start transition to 100
-                                          // For now, just exit
-                self.show_enemy_ansi = false;
+                // No more dialogues, transition to thank you screen
+                self.dialogue_active = false; // Deactivate dialogue mode
             }
             return;
         }
@@ -647,6 +644,25 @@ impl GameState {
                 }
             }
             TeleportState::None => {}
+            TeleportState::ThankYouScreen => {
+                if let Some(timer) = self.teleport_transition_timer {
+                    let elapsed = timer.elapsed();
+                    let fade_duration = Duration::from_secs(2); // Longer fade-in for thank you screen
+
+                    if elapsed >= fade_duration {
+                        self.deltarune.level = 0;
+                        self.teleport_state = TeleportState::None; // Transition complete
+                        self.teleport_transition_timer = None;
+                    } else {
+                        let progress = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+                        self.deltarune.level = (100.0 - (progress * 100.0)).max(0.0_f32) as u8;
+                    }
+                } else {
+                    // Start fade-in when entering ThankYouScreen
+                    self.teleport_transition_timer = Some(Instant::now());
+                    self.deltarune.level = 100; // Ensure it starts black
+                }
+            }
         }
 
         if let Some((key, map)) = map_to_insert_after_loop {

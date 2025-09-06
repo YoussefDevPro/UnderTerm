@@ -64,6 +64,10 @@ macro_rules! load_sprite_asset_str {
                 env!("CARGO_MANIFEST_DIR"),
                 "/assets/sprites/enemy/not_a_placeholder/battle_smile.ans"
             )),
+            "assets/sprites/ME/idle/insanly_dead.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/ME/idle/insanly_dead.ans"
+            )),
             _ => "",
         }
     };

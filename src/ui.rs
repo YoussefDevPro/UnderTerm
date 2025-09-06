@@ -14,18 +14,19 @@ use ratatui::{
 };
 
 fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
     if let Some(fig_text) = font.convert(text) {
         let mut fig_text_str = fig_text.to_string();
-        if text.trim_start().starts_with('t') || text.trim_start().starts_with('T') {
-            let mut lines: Vec<String> =
-                fig_text_str.lines().map(|l| l.to_string()).collect();
-            if lines.len() >= 3 {
-                lines[1] = format!(" {}", lines[1]);
-                lines[2] = format!(" {}", lines[2]);
-            }
-            fig_text_str = lines.join("\n");
-        }
-        fig_text_str
+            if text.trim() == "t" || text.trim() == "T" {
+                let mut lines: Vec<String> = fig_text_str.lines().map(|l| l.to_string()).collect();
+                if lines.len() >= 3 {
+                    lines[1] = format!(" {}", lines[1].trim_start());
+                    lines[2] = lines[2].trim_start().to_string();
+                }
+                fig_text_str = lines.join("\n");
+            }        fig_text_str
     } else {
         "FIGLET CONVERSION FAILED".to_string()
     }
@@ -144,8 +145,8 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
                     let mut lines: Vec<String> =
                         fig_text_str.lines().map(|l| l.to_string()).collect();
                     if lines.len() >= 3 {
-                        lines[1] = format!(" {}", lines[1]);
-                        lines[2] = format!(" {}", lines[2]);
+                    lines[1] = format!(" {}", lines[1].trim_start());
+                    lines[2] = lines[2].trim_start().to_string();
                     }
                     fig_text_str = lines.join("\n");
                 }
@@ -200,7 +201,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
                 let wrapped_text = wrap_text_to_width(chunk, text_chunks[i].width);
                 let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
                 let text_paragraph = Paragraph::new(fig_text_str)
-                    .wrap(ratatui::widgets::Wrap { trim: true })
+                    .wrap(ratatui::widgets::Wrap { trim: false })
                     .style(Style::default().add_modifier(Modifier::BOLD));
                 frame.render_widget(text_paragraph, text_chunks[i]);
             }
@@ -208,11 +209,62 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
     }
 }
 
+fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
+    let size = frame.area();
+    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+
+    let ansi_content = load_sprite_asset_str!("assets/sprites/ME/idle/insanly_dead.ans");
+    let ansi_text = game_state.darken_text(ansi_content.as_bytes().into_text().unwrap(), game_state.deltarune.level);
+    let ansi_height = ansi_text.lines.len() as u16;
+    let mut ansi_width = 0;
+    for line in ansi_text.lines.iter() {
+        let line_width = line.width() as u16;
+        if line_width > ansi_width {
+            ansi_width = line_width;
+        }
+    }
+
+    let ansi_draw_width = ansi_width.min(size.width);
+    let ansi_draw_height = ansi_height.min(size.height);
+
+    let ansi_x = (size.width.saturating_sub(ansi_draw_width)) / 2;
+    let ansi_y = (size.height.saturating_sub(ansi_draw_height)) / 2;
+
+    let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_draw_width, ansi_draw_height);
+    frame.render_widget(Paragraph::new(ansi_text), ansi_area);
+
+    let font = FIGfont::from_file("assets/fonts/miniwi.flf").unwrap();
+    let thank_you_text = "thank u for playing?";
+    let fig_text = game_state.darken_text(Text::raw(convert_and_fix_t(&font, thank_you_text)), game_state.deltarune.level);
+
+    let fig_text_lines: Vec<String> = fig_text.lines.iter().map(|l| l.to_string()).collect();
+    let fig_text_height = fig_text_lines.len() as u16;
+    let mut fig_text_width = 0;
+    for line in fig_text_lines {
+        let line_width = line.len() as u16;
+        if line_width > fig_text_width {
+            fig_text_width = line_width;
+        }
+    }
+
+    let text_x = (size.width.saturating_sub(fig_text_width)) / 2;
+    let text_y = size.height.saturating_sub(fig_text_height + 1);
+
+    let text_area = ratatui::layout::Rect::new(text_x, text_y, fig_text_width, fig_text_height);
+    frame.render_widget(Paragraph::new(fig_text), text_area);
+}
+
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
 
     if game_state.dialogue_active {
         draw_dialogue(frame, game_state);
+        return;
+    }
+
+    // If dialogue is not active and screen is black, draw the thank you screen
+    if !game_state.dialogue_active && game_state.deltarune.level >= 99 {
+        draw_thank_you_screen(frame, game_state);
         return;
     }
 
@@ -465,6 +517,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
         let ascii_art = convert_and_fix_t(&font, &game_state.animated_message_content);
         let message_paragraph = Paragraph::new(ascii_art)
+            .wrap(ratatui::widgets::Wrap { trim: false })
             .style(
                 Style::default()
                     .fg(Color::Rgb(255, 255, 255))
@@ -679,9 +732,9 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         let dot_line_2 = "▀██▀ ".repeat(num_dots);
 
         let combined_lines = vec![
-            format!("{}\n {}", exiting_text_lines[0], dot_line_0),
-            format!("{}\n {}", exiting_text_lines[1], dot_line_1),
-            format!("{}\n {}", exiting_text_lines[2], dot_line_2),
+            format!("{}\n{}", exiting_text_lines[0], dot_line_0),
+            format!("{}\n{}", exiting_text_lines[1], dot_line_1),
+            format!("{}\n{}", exiting_text_lines[2], dot_line_2),
         ];
         let combined_text = combined_lines.join("\n");
 
