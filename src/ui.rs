@@ -158,7 +158,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             }
             let (chunk, rest) = remaining_text.split_at(best_split);
             chunks.push(chunk.to_string());
-            remaining_text = rest.trim_start();
+            remaining_text = rest;
         }
 
         let num_chunks = chunks.len();
