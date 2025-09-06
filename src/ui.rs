@@ -211,7 +211,7 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
     let font = FIGfont::from_file("assets/fonts/toilet_fonts/3d.flf").unwrap();
-    let thank_you_text = "thank u for playing?";
+    let thank_you_text = "Thanks for playing ?";
     let fig_text = game_state.darken_text(
         Text::raw(convert_and_fix_t(&font, thank_you_text)),
         game_state.deltarune.level,

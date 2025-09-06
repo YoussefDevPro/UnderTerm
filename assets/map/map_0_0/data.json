@@ -3955,6 +3955,17 @@
         "useless flowers ..."
       ],
       "events": []
+    },
+    {
+      "id": 3,
+      "x": 14,
+      "y": 30,
+      "width": 3,
+      "height": 26,
+      "messages": [
+        "ititss ititss a a  wwaallll  llooll"
+      ],
+      "events": []
     }
   ],
   "placed_sprites": [],
