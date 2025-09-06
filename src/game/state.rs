@@ -33,6 +33,7 @@ pub enum TeleportState {
     FadingOut,
     FadingIn,
     ThankYouScreen,
+    FadingOutToThankYou,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -644,23 +645,35 @@ impl GameState {
                 }
             }
             TeleportState::None => {}
-            TeleportState::ThankYouScreen => {
+            TeleportState::FadingOutToThankYou => {
                 if let Some(timer) = self.teleport_transition_timer {
                     let elapsed = timer.elapsed();
-                    let fade_duration = Duration::from_secs(2); // Longer fade-in for thank you screen
+                    let fade_duration = Duration::from_millis(500);
 
                     if elapsed >= fade_duration {
-                        self.deltarune.level = 0;
-                        self.teleport_state = TeleportState::None; // Transition complete
-                        self.teleport_transition_timer = None;
+                        self.deltarune.level = 100;
+                        self.teleport_state = TeleportState::ThankYouScreen;
+                        self.teleport_transition_timer = Some(Instant::now());
                     } else {
                         let progress = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
-                        self.deltarune.level = (100.0 - (progress * 100.0)).max(0.0_f32) as u8;
+                        self.deltarune.level = (progress * 100.0).min(100.0) as u8;
                     }
-                } else {
-                    // Start fade-in when entering ThankYouScreen
-                    self.teleport_transition_timer = Some(Instant::now());
-                    self.deltarune.level = 100; // Ensure it starts black
+                }
+            }
+            TeleportState::ThankYouScreen => {
+                if let Some(timer) = self.teleport_transition_timer {
+                    if self.deltarune.level > 0 {
+                        let elapsed = timer.elapsed();
+                        let fade_duration = Duration::from_millis(500);
+
+                        if elapsed >= fade_duration {
+                            self.deltarune.level = 0;
+                            self.teleport_transition_timer = None;
+                        } else {
+                            let progress = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+                            self.deltarune.level = (100.0 - (progress * 100.0)).max(0.0_f32) as u8;
+                        }
+                    }
                 }
             }
         }

@@ -40,8 +40,10 @@ pub fn process_events(
                     if game_state.dialogue_manager.text_animation_finished {
                         let is_last_dialogue = game_state.dialogue_manager.advance_dialogue();
                         if is_last_dialogue {
-                            game_state.deltarune.level = 100; // Immediately make screen black
-                            game_state.dialogue_active = false; // Exit dialogue mode
+                            game_state.dialogue_active = false;
+                            game_state.teleport_state =
+                                crate::game::state::TeleportState::FadingOutToThankYou;
+                            game_state.teleport_transition_timer = Some(Instant::now());
                         }
                     } else {
                         game_state.dialogue_manager.skip_animation();

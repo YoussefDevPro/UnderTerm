@@ -228,12 +228,12 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     let ansi_draw_height = ansi_height.min(size.height);
 
     let ansi_x = (size.width.saturating_sub(ansi_draw_width)) / 2;
-    let ansi_y = (size.height.saturating_sub(ansi_draw_height)) / 2;
+    let ansi_y = (size.height.saturating_sub(ansi_draw_height)) / 2 + 5;
 
     let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_draw_width, ansi_draw_height);
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
-    let font = FIGfont::from_file("assets/fonts/miniwi.flf").unwrap();
+    let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
     let thank_you_text = "thank u for playing?";
     let fig_text = game_state.darken_text(Text::raw(convert_and_fix_t(&font, thank_you_text)), game_state.deltarune.level);
 
@@ -248,7 +248,7 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     let text_x = (size.width.saturating_sub(fig_text_width)) / 2;
-    let text_y = size.height.saturating_sub(fig_text_height + 1);
+    let text_y = size.height / 4;
 
     let text_area = ratatui::layout::Rect::new(text_x, text_y, fig_text_width, fig_text_height);
     frame.render_widget(Paragraph::new(fig_text), text_area);
@@ -259,6 +259,11 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     if game_state.dialogue_active {
         draw_dialogue(frame, game_state);
+        return;
+    }
+
+    if game_state.teleport_state == crate::game::state::TeleportState::ThankYouScreen {
+        draw_thank_you_screen(frame, game_state);
         return;
     }
 
@@ -498,6 +503,9 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     if game_state.show_message {
+        if game_state.animated_message_content.is_empty() {
+            return; // Don't draw if message content is empty
+        }
         let message_block = Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Thick)
