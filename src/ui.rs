@@ -18,15 +18,7 @@ fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
         return String::new();
     }
     if let Some(fig_text) = font.convert(text) {
-        let mut fig_text_str = fig_text.to_string();
-            if text.trim() == "t" || text.trim() == "T" {
-                let mut lines: Vec<String> = fig_text_str.lines().map(|l| l.to_string()).collect();
-                if lines.len() >= 3 {
-                    lines[1] = format!(" {}", lines[1].trim_start());
-                    lines[2] = lines[2].trim_start().to_string();
-                }
-                fig_text_str = lines.join("\n");
-            }        fig_text_str
+        fig_text.to_string()
     } else {
         "FIGLET CONVERSION FAILED".to_string()
     }
@@ -138,24 +130,6 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
 
         let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
 
-        fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
-            if let Some(fig_text) = font.convert(text) {
-                let mut fig_text_str = fig_text.to_string();
-                if text.trim_start().starts_with('t') || text.trim_start().starts_with('T') {
-                    let mut lines: Vec<String> =
-                        fig_text_str.lines().map(|l| l.to_string()).collect();
-                    if lines.len() >= 3 {
-                    lines[1] = format!(" {}", lines[1].trim_start());
-                    lines[2] = lines[2].trim_start().to_string();
-                    }
-                    fig_text_str = lines.join("\n");
-                }
-                fig_text_str
-            } else {
-                "FIGLET CONVERSION FAILED".to_string()
-            }
-        }
-
         let mut chunks = Vec::new();
         let visible_text = dialogue
             .text
@@ -214,7 +188,10 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
     let ansi_content = load_sprite_asset_str!("assets/sprites/ME/idle/insanly_dead.ans");
-    let ansi_text = game_state.darken_text(ansi_content.as_bytes().into_text().unwrap(), game_state.deltarune.level);
+    let ansi_text = game_state.darken_text(
+        ansi_content.as_bytes().into_text().unwrap(),
+        game_state.deltarune.level,
+    );
     let ansi_height = ansi_text.lines.len() as u16;
     let mut ansi_width = 0;
     for line in ansi_text.lines.iter() {
@@ -227,15 +204,18 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     let ansi_draw_width = ansi_width.min(size.width);
     let ansi_draw_height = ansi_height.min(size.height);
 
-    let ansi_x = (size.width.saturating_sub(ansi_draw_width)) / 2;
-    let ansi_y = (size.height.saturating_sub(ansi_draw_height)) / 2 + 5;
+    let ansi_x = (size.width.saturating_sub(ansi_draw_width)) / 2 + 20;
+    let ansi_y = (size.height.saturating_sub(ansi_draw_height)) / 2 + 10;
 
     let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_draw_width, ansi_draw_height);
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
-    let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
+    let font = FIGfont::from_file("assets/fonts/toilet_fonts/3d.flf").unwrap();
     let thank_you_text = "thank u for playing?";
-    let fig_text = game_state.darken_text(Text::raw(convert_and_fix_t(&font, thank_you_text)), game_state.deltarune.level);
+    let fig_text = game_state.darken_text(
+        Text::raw(convert_and_fix_t(&font, thank_you_text)),
+        game_state.deltarune.level,
+    );
 
     let fig_text_lines: Vec<String> = fig_text.lines.iter().map(|l| l.to_string()).collect();
     let fig_text_height = fig_text_lines.len() as u16;
@@ -247,7 +227,7 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
         }
     }
 
-    let text_x = (size.width.saturating_sub(fig_text_width)) / 2;
+    let text_x = (size.width.saturating_sub(fig_text_width)) / 2 + 10;
     let text_y = size.height / 4;
 
     let text_area = ratatui::layout::Rect::new(text_x, text_y, fig_text_width, fig_text_height);

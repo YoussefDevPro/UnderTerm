@@ -444,102 +444,106 @@ impl GameState {
 
         let mut teleport_destination: Option<(u16, u16, i32, i32, String, u32)> = None;
         let mut interacting_with_box_this_frame = false;
-        if let Some(current_map) = self
-            .loaded_maps
-            .get(&(self.current_map_row, self.current_map_col))
-        {
-            for select_box in &current_map.select_object_boxes {
-                if select_box.to_rect().intersects(player_interaction_rect) {
-                    interacting_with_box_this_frame = true;
+        if self.teleport_state == TeleportState::None {
+            if let Some(current_map) = self
+                .loaded_maps
+                .get(&(self.current_map_row, self.current_map_col))
+            {
+                for select_box in &current_map.select_object_boxes {
+                    if select_box.to_rect().intersects(player_interaction_rect) {
+                        interacting_with_box_this_frame = true;
 
-                    if self.recently_teleported_from_box_id == Some(select_box.id) {
-                        if select_box.to_rect().intersects(player_collision_rect) {
-                            if select_box.events.iter().any(|e| {
-                                matches!(e, crate::game::map::Event::TeleportPlayer { .. })
-                            }) {
-                                // if we just teleported in a tp box, we don't tp, until we get out
-                                // of it :3
+                        if self.recently_teleported_from_box_id == Some(select_box.id) {
+                            if select_box.to_rect().intersects(player_collision_rect) {
+                                if select_box.events.iter().any(|e| {
+                                    matches!(e, crate::game::map::Event::TeleportPlayer { .. })
+                                }) {
+                                    // if we just teleported in a tp box, we don't tp, until we get out
+                                    // of it :3
+                                }
                             }
-                        }
-                        continue;
-                    }
-
-                    if self.current_interaction_box_id == Some(select_box.id) {
-                    } else if !select_box.messages.is_empty() {
-                        self.current_interaction_box_id = Some(select_box.id);
-                        self.current_message_index = 0;
-                    }
-                }
-
-                if select_box.to_rect().intersects(player_collision_rect) {
-                    if self.just_teleported {
-                        continue;
-                    }
-                    if let Some(timer) = self.teleport_cooldown_timer {
-                        if timer.elapsed() < crate::game::config::TELEPORT_COOLDOWN_DURATION {
                             continue;
                         }
-                    }
-                    if self.recently_teleported_from_box_id == Some(select_box.id) {
-                        continue;
-                    }
 
-                    for event in &select_box.events {
-                        match event {
-                            crate::game::map::Event::TeleportPlayer {
-                                map_row,
-                                map_col,
-                                dest_x,
-                                dest_y,
-                            } => {
-                                let new_map_name = format!("map_{}_{}", map_row, map_col);
-                                let new_map_key = (*map_row, *map_col);
-                                let mut loaded_map: Option<Map> = None;
-                                if !self.loaded_maps.contains_key(&new_map_key) {
-                                    if let Ok(map) = crate::game::map::Map::load(&new_map_name) {
-                                        loaded_map = Some(map);
-                                    } else {
-                                        self.message =
-                                            format!("Failed to load map: {}", new_map_name);
-                                        self.show_message = true;
-                                        self.message_animation_start_time = Instant::now();
-                                        self.animated_message_content.clear();
-                                        break;
-                                    }
-                                }
-
-                                let map_is_available = self.loaded_maps.contains_key(&new_map_key)
-                                    || loaded_map.is_some();
-
-                                if let Some(map) = loaded_map {
-                                    map_to_insert_after_loop = Some((new_map_key, map));
-                                }
-
-                                if map_is_available {
-                                    teleport_destination = Some((
-                                        *dest_x as u16,
-                                        *dest_y as u16,
-                                        *map_row,
-                                        *map_col,
-                                        new_map_name,
-                                        select_box.id,
-                                    ));
-                                }
-                                break;
-                            }
+                        if self.current_interaction_box_id == Some(select_box.id) {
+                        } else if !select_box.messages.is_empty() {
+                            self.current_interaction_box_id = Some(select_box.id);
+                            self.current_message_index = 0;
                         }
                     }
-                    if teleport_destination.is_some() {
-                        break;
+
+                    if select_box.to_rect().intersects(player_collision_rect) {
+                        if self.just_teleported {
+                            continue;
+                        }
+                        if let Some(timer) = self.teleport_cooldown_timer {
+                            if timer.elapsed() < crate::game::config::TELEPORT_COOLDOWN_DURATION {
+                                continue;
+                            }
+                        }
+                        if self.recently_teleported_from_box_id == Some(select_box.id) {
+                            continue;
+                        }
+
+                        for event in &select_box.events {
+                            match event {
+                                crate::game::map::Event::TeleportPlayer {
+                                    map_row,
+                                    map_col,
+                                    dest_x,
+                                    dest_y,
+                                } => {
+                                    let new_map_name = format!("map_{}_{}", map_row, map_col);
+                                    let new_map_key = (*map_row, *map_col);
+                                    let mut loaded_map: Option<Map> = None;
+                                    if !self.loaded_maps.contains_key(&new_map_key) {
+                                        if let Ok(map) = crate::game::map::Map::load(&new_map_name)
+                                        {
+                                            loaded_map = Some(map);
+                                        } else {
+                                            self.message =
+                                                format!("Failed to load map: {}", new_map_name);
+                                            self.show_message = true;
+                                            self.message_animation_start_time = Instant::now();
+                                            self.animated_message_content.clear();
+                                            break;
+                                        }
+                                    }
+
+                                    let map_is_available =
+                                        self.loaded_maps.contains_key(&new_map_key)
+                                            || loaded_map.is_some();
+
+                                    if let Some(map) = loaded_map {
+                                        map_to_insert_after_loop = Some((new_map_key, map));
+                                    }
+
+                                    if map_is_available {
+                                        teleport_destination = Some((
+                                            *dest_x as u16,
+                                            *dest_y as u16,
+                                            *map_row,
+                                            *map_col,
+                                            new_map_name,
+                                            select_box.id,
+                                        ));
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if teleport_destination.is_some() {
+                            break;
+                        }
                     }
                 }
-            }
 
-            for battle_zone in &current_map.battle_zones {
-                if battle_zone.to_rect().intersects(player_collision_rect) {
-                    self.is_flickering = true;
-                    self.flicker_count = 10;
-                    audio.play_enemy_encounter_sound();
+                for battle_zone in &current_map.battle_zones {
+                    if battle_zone.to_rect().intersects(player_collision_rect) {
+                        self.is_flickering = true;
+                        self.flicker_count = 10;
+                        audio.play_enemy_encounter_sound();
+                    }
                 }
             }
         }
