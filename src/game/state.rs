@@ -116,6 +116,7 @@ pub struct GameState {
     #[serde(skip)]
     pub pending_teleport_destination: Option<(u16, u16, i32, i32, String, u32)>,
     pub game_over_active: bool,
+    pub resized: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -195,6 +196,7 @@ impl GameState {
             teleport_transition_timer: None,
             pending_teleport_destination: None,
             game_over_active: false,
+            resized: false,
         }
     }
 

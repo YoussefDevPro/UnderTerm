@@ -59,6 +59,11 @@ pub fn run(
                 &mut audio,
             );
 
+            if game_state.resized {
+                terminal.clear()?;
+                game_state.resized = false; // Reset the flag
+            }
+
             if game_should_exit {
                 return Ok(());
             }
