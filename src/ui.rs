@@ -128,7 +128,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             face_area,
         );
 
-        let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
+        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
 
         let mut chunks = Vec::new();
         let visible_text = dialogue
@@ -210,7 +210,7 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_draw_width, ansi_draw_height);
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
-    let font = FIGfont::from_file("assets/fonts/toilet_fonts/3d.flf").unwrap();
+    let font = FIGfont::from_file("assets/fonts/3d.flf").unwrap();
     let thank_you_text = "Thanks for playing ?";
     let fig_text = game_state.darken_text(
         Text::raw(convert_and_fix_t(&font, thank_you_text)),
@@ -502,7 +502,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .padding(ratatui::widgets::Padding::new(8, 8, 1, 1))
             .title("Message");
 
-        let font = FIGfont::from_file("assets/fonts/toilet_fonts/Calvin S.flf").unwrap();
+        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
         let ascii_art = convert_and_fix_t(&font, &game_state.animated_message_content);
         let message_paragraph = Paragraph::new(ascii_art)
             .wrap(ratatui::widgets::Wrap { trim: false })
