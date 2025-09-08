@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use super::config::{
     ANIMATION_FRAME_DURATION, DEBUG_MOVEMENT_FRAME_INTERVAL, PLAYER_HORIZONTAL_SPEED,
     PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH, PLAYER_SPEED,
@@ -94,8 +95,8 @@ impl Player {
         (text, max_width, height)
     }
 
-    pub fn get_sprite_content_from_binary(&self) -> &'static str {
-        match self.direction {
+    pub fn get_sprite_content_from_binary(&self) -> Cow<'static, str> {
+        let content = match self.direction {
             PlayerDirection::Front => {
                 if self.is_walking {
                     match self.animation_frame {
@@ -144,6 +145,12 @@ impl Player {
                     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/sprites/frisk/idle/frisk_idle_right.ans"))
                 }
             }
+        };
+
+        if cfg!(windows) {
+            Cow::Owned(content.replace("\r\n", "\n"))
+        } else {
+            Cow::Borrowed(content)
         }
     }
 

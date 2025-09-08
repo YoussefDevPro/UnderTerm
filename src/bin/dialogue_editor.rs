@@ -117,7 +117,12 @@ impl Editor {
 
                     if let Some(path) = self.faces.get(self.selected_face_index) {
                         let content = load_sprite_asset_str!(path.as_str());
-                        let text = content.as_bytes().into_text().unwrap();
+                        let fixed_content = if cfg!(windows) {
+                            content.replace("\r\n", "\n")
+                        } else {
+                            content.to_string()
+                        };
+                        let text = fixed_content.as_bytes().into_text().unwrap();
                         let paragraph = Paragraph::new(text)
                             .block(Block::default().title("Preview").borders(Borders::ALL));
                         f.render_widget(paragraph, chunks[1]);
@@ -141,7 +146,12 @@ impl Editor {
 
                     if let Some(path) = self.enemies.get(self.selected_enemy_index) {
                         let content = load_sprite_asset_str!(path.as_str());
-                        let text = content.as_bytes().into_text().unwrap();
+                        let fixed_content = if cfg!(windows) {
+                            content.replace("\r\n", "\n")
+                        } else {
+                            content.to_string()
+                        };
+                        let text = fixed_content.as_bytes().into_text().unwrap();
                         let paragraph = Paragraph::new(text)
                             .block(Block::default().title("Preview").borders(Borders::ALL));
                         f.render_widget(paragraph, chunks[1]);

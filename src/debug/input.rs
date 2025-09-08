@@ -85,7 +85,12 @@ pub fn handle_debug_input(key: KeyEvent, game_state: &mut GameState) -> bool {
             if !game_state.is_placing_sprite {
                 game_state.is_placing_sprite = true;
                 let sprite_content = include_str!("../../assets/sprites/ME/idle/default.ans");
-                let text = sprite_content.as_bytes().into_text().unwrap();
+                let fixed_content = if cfg!(windows) {
+                    sprite_content.replace("\r\n", "\n")
+                } else {
+                    sprite_content.to_string()
+                };
+                let text = fixed_content.as_bytes().into_text().unwrap();
                 let height = text.lines.len() as u32;
                 let mut width = 0;
                 for line in text.lines.iter() {

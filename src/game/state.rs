@@ -356,7 +356,7 @@ impl GameState {
                         let player_collision_rect = self.player.get_collision_rect();
                         if !teleport_box.to_rect().intersects(player_collision_rect) {
                             self.recently_teleported_from_box_id = None;
-                            self.last_teleport_origin = None; // Clear origin once out of the box
+                            self.last_teleport_origin = None;
                         }
                     } else {
                         self.recently_teleported_from_box_id = None;

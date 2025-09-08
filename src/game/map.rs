@@ -141,10 +141,16 @@ impl Map {
         }
         let map_data: MapData = serde_json::from_str(data_content)?;
 
-        let ansi_sprite = load_map_asset_str!(map_name, "sprite.ans");
-        if ansi_sprite.is_empty() {
+        let ansi_sprite_content = load_map_asset_str!(map_name, "sprite.ans");
+        if ansi_sprite_content.is_empty() {
             return Err(format!("Map sprite for {} not found", map_name).into());
         }
+
+        let ansi_sprite = if cfg!(windows) {
+            ansi_sprite_content.replace("\r\n", "\n")
+        } else {
+            ansi_sprite_content.to_string()
+        };
 
         // map dimension
         let map_text_for_dimensions = ansi_sprite.as_bytes().into_text().unwrap();

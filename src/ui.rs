@@ -30,7 +30,12 @@ fn draw_enemy_ansi(frame: &mut Frame) {
     frame.render_widget(background, size);
 
     let ansi_content = include_str!("../assets/sprites/enemy/not_a_placeholder/battle_3.ans");
-    let enemy_text = ansi_content.as_bytes().into_text().unwrap();
+    let fixed_content = if cfg!(windows) {
+        ansi_content.replace("\r\n", "\n")
+    } else {
+        ansi_content.to_string()
+    };
+    let enemy_text = fixed_content.as_bytes().into_text().unwrap();
     let enemy_height = enemy_text.lines.len() as u16;
     let mut enemy_width = 0;
     for line in enemy_text.lines.iter() {
@@ -58,7 +63,12 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
         let enemy_ansi = load_sprite_asset_str!(dialogue.enemy_ansi_path.as_str());
-        let enemy_text = enemy_ansi.as_bytes().into_text().unwrap();
+        let fixed_enemy_ansi = if cfg!(windows) {
+            enemy_ansi.replace("\r\n", "\n")
+        } else {
+            enemy_ansi.to_string()
+        };
+        let enemy_text = fixed_enemy_ansi.as_bytes().into_text().unwrap();
         let enemy_height = enemy_text.lines.len() as u16;
         let mut enemy_width = 0;
         for line in enemy_text.lines.iter() {
@@ -122,9 +132,13 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         let text_area = ratatui::layout::Rect::new(text_x, text_y, text_width, text_height);
 
         let face_ansi = load_sprite_asset_str!(dialogue.face_ansi_path.as_str());
-        let face_text = face_ansi.as_bytes().into_text().unwrap();
+        let fixed_face_ansi = if cfg!(windows) {
+            face_ansi.replace("\r\n", "\n")
+        } else {
+            face_ansi.to_string()
+        };
         frame.render_widget(
-            Paragraph::new(face_text).style(Style::default().add_modifier(Modifier::BOLD)),
+            Paragraph::new(fixed_face_ansi.as_bytes().into_text().unwrap()).style(Style::default().add_modifier(Modifier::BOLD)),
             face_area,
         );
 
@@ -188,8 +202,13 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
 
     let ansi_content = load_sprite_asset_str!("assets/sprites/ME/idle/insanly_dead.ans");
+    let fixed_ansi_content = if cfg!(windows) {
+        ansi_content.replace("\r\n", "\n")
+    } else {
+        ansi_content.to_string()
+    };
     let ansi_text = game_state.darken_text(
-        ansi_content.as_bytes().into_text().unwrap(),
+        fixed_ansi_content.as_bytes().into_text().unwrap(),
         game_state.deltarune.level,
     );
     let ansi_height = ansi_text.lines.len() as u16;

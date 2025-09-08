@@ -44,8 +44,10 @@ pub fn process_events(
                                     crate::game::state::TeleportState::FadingOutToThankYou;
                                 game_state.teleport_transition_timer = Some(Instant::now());
                             }
+                        } else {
+                            game_state.dialogue_manager.skip_animation();
                         }
-                    } else {
+                    } else if key.kind == event::KeyEventKind::Press {
                         game_state.dialogue_manager.skip_animation();
                     }
                     continue;
@@ -455,7 +457,7 @@ pub fn process_events(
                     _ => {}
                 }
             }
-            Event::Resize(width, height) => {
+            Event::Resize(_width, _height) => {
                 game_state.resized = true;
                 // No explicit action needed here for redrawing, as game_loop.rs
                 // already gets the terminal size every frame and ratatui handles it.
