@@ -4,7 +4,9 @@ use crate::game::utils::wrap_text_to_width;
 use crate::load_sprite_asset_str;
 use ansi_to_tui::IntoText;
 use figlet_rs::FIGfont;
+use ratatui::prelude::Alignment;
 use ratatui::prelude::Text;
+use std::time::Instant;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -138,7 +140,8 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             face_ansi.to_string()
         };
         frame.render_widget(
-            Paragraph::new(fixed_face_ansi.as_bytes().into_text().unwrap()).style(Style::default().add_modifier(Modifier::BOLD)),
+            Paragraph::new(fixed_face_ansi.as_bytes().into_text().unwrap())
+                .style(Style::default().add_modifier(Modifier::BOLD)),
             face_area,
         );
 
@@ -253,7 +256,111 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     frame.render_widget(Paragraph::new(fig_text), text_area);
 }
 
+const MIN_TERMINAL_WIDTH: u16 = 225;
+const MIN_TERMINAL_HEIGHT: u16 = 56;
+
 pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
+    let size = frame.area();
+
+    if size.width < MIN_TERMINAL_WIDTH || size.height < MIN_TERMINAL_HEIGHT {
+        // Clear any existing message state
+        game_state.show_message = false; // Ensure the general message box is not drawn
+        game_state.animated_message_content.clear(); // Clear animated content
+        game_state.message.clear(); // Clear the message itself
+
+        frame.render_widget(Block::default().bg(Color::Reset), size);
+
+        // Manually draw the "Terminal too small" debug message
+        let debug_msg = format!(
+            "Terminal too small! Current: {}x{}. Min: {}x{}",
+            size.width, size.height, MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT
+        );
+        let debug_paragraph = Paragraph::new(debug_msg)
+            .style(Style::default().fg(Color::Red).bg(Color::Rgb(0, 0, 0)));
+        let debug_area = ratatui::layout::Rect::new(0, 0, size.width, 1);
+        frame.render_widget(debug_paragraph, debug_area);
+
+        let peefest_ansi_content = include_str!("../assets/sprites/peefest.ans");
+        let fixed_peefest_content = if cfg!(windows) {
+            peefest_ansi_content.replace("\r\n", "\n")
+        } else {
+            peefest_ansi_content.to_string()
+        };
+        let peefest_text = fixed_peefest_content.as_bytes().into_text().unwrap();
+
+        let peefest_height = peefest_text.lines.len() as u16;
+        let mut peefest_width = 0;
+        for line in peefest_text.lines.iter() {
+            let line_width = line.width() as u16;
+            if line_width > peefest_width {
+                peefest_width = line_width;
+            }
+        }
+
+        let peefest_draw_width = peefest_width.min(size.width);
+        let peefest_draw_height = peefest_height.min(size.height);
+
+        let peefest_x = (size.width.saturating_sub(peefest_draw_width)) / 2;
+        let peefest_y = (size.height.saturating_sub(peefest_draw_height)) / 2;
+
+        let peefest_area = ratatui::layout::Rect::new(
+            peefest_x,
+            peefest_y,
+            peefest_draw_width,
+            peefest_draw_height,
+        );
+        frame.render_widget(Paragraph::new(peefest_text), peefest_area);
+
+        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+
+        let messages = vec![
+            "please make ur terminal window bigger",
+            "or make the font size of ur terminal smaller",
+            "please !",
+        ];
+
+        let mut current_y = peefest_y
+            .saturating_add(peefest_draw_height)
+            .saturating_add(2);
+
+        for msg_line in messages {
+            let fig_text = Text::raw(convert_and_fix_t(&font, msg_line));
+            let fig_text_lines: Vec<String> =
+                fig_text.lines.iter().map(|l| l.to_string()).collect();
+            let fig_text_height = fig_text_lines.len() as u16;
+            let mut fig_text_width = 0;
+            for line in fig_text_lines {
+                let line_width = line.len() as u16;
+                if line_width > fig_text_width {
+                    fig_text_width = line_width;
+                }
+            }
+
+            let fig_text_draw_width = fig_text_width.min(size.width);
+            let fig_text_draw_height = fig_text_height.min(size.height.saturating_sub(current_y));
+
+            let text_x = (size.width.saturating_sub(fig_text_draw_width)) / 2;
+            let text_y = current_y;
+
+            let text_area = ratatui::layout::Rect::new(
+                text_x,
+                text_y,
+                fig_text_draw_width,
+                fig_text_draw_height,
+            );
+            frame.render_widget(
+                Paragraph::new(fig_text)
+                    .wrap(ratatui::widgets::Wrap { trim: false })
+                    .alignment(Alignment::Center),
+                text_area,
+            );
+
+            current_y = current_y.saturating_add(fig_text_draw_height);
+        }
+
+        return;
+    }
+
     let size = frame.area();
 
     if game_state.dialogue_active {

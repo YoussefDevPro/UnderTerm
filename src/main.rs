@@ -1,5 +1,5 @@
 use std::io::{self, stdout, IsTerminal};
-use under_term::{game, game_loop};
+use under_term::{game, game_loop, crash_handler};
 
 use crossterm::{
     event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
@@ -9,6 +9,8 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 fn run_app() -> io::Result<()> {
+    crash_handler::set_panic_hook();
+
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
