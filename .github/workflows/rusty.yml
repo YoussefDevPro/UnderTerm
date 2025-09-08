@@ -46,7 +46,8 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--release --bin under_term"
           strip: true
-          cc-args: "-DMINIMP3_NO_SIMD"
+        env:
+          CFLAGS: "-DMINIMP3_NO_SIMD"
 
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
