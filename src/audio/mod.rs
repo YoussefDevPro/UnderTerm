@@ -26,7 +26,7 @@ impl Audio {
     }
 
     pub fn play_text_sound(&mut self) {
-        let bytes = include_bytes!("../../assets/sound/A.mp3");
+        let bytes = include_bytes!("../../assets/sound/TEXT.mp3");
         let decoder = Decoder::new(Cursor::new(&bytes[..])).unwrap();
         let sink = rodio::Sink::try_new(&self.stream_handle).unwrap();
         sink.set_volume(4.0);

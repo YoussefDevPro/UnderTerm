@@ -5,8 +5,8 @@ use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
-use rand::thread_rng;
 use rand::Rng;
+use rand::thread_rng;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span, Text};
@@ -34,6 +34,86 @@ pub enum TeleportState {
     FadingIn,
     ThankYouScreen,
     FadingOutToThankYou,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntroFrame {
+    pub ansi_path: String,
+    pub texts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntroState {
+    pub frames: Vec<IntroFrame>,
+    pub current_frame_index: usize,
+    pub current_text_index: usize,
+    pub animated_text: String,
+    #[serde(skip, default = "default_instant")]
+    pub text_animation_timer: Instant,
+    #[serde(skip)]
+    pub text_animation_interval: Duration,
+    pub text_animation_finished: bool,
+    #[serde(skip)]
+    pub post_text_delay_timer: Option<Instant>,
+    pub is_fading_out: bool,
+    #[serde(skip)]
+    pub fade_out_timer: Option<Instant>,
+}
+
+impl IntroState {
+    pub fn new() -> Self {
+        let frames = vec![
+            IntroFrame {
+                ansi_path: "assets/sprites/animation/0.ans".to_string(),
+                texts: vec![
+                    "All started one day, when youssef had no fucking project to work on"
+                        .to_string(),
+                    "he was feeling useless, and the only solution...".to_string(),
+                ],
+            },
+            IntroFrame {
+                ansi_path: "assets/sprites/animation/1.ans".to_string(),
+                texts: vec![
+                    "was to thenk hard".to_string(),
+                    "extremly hard..".to_string(),
+                    "until, got an idea..".to_string(),
+                ],
+            },
+            IntroFrame {
+                ansi_path: "assets/sprites/animation/2.ans".to_string(),
+                texts: vec![
+                    "he remembered of undertale, a game he really enjoyed playing it".to_string(),
+                    "and because he is a terminal nerd, he got a nerdy idea...".to_string(),
+                ],
+            },
+            IntroFrame {
+                ansi_path: "assets/sprites/animation/3.ans".to_string(),
+                texts: vec![
+                    "to make the fucking game run in the terminal..".to_string(),
+                    "BECAUSE, why not..".to_string(),
+                ],
+            },
+            IntroFrame {
+                ansi_path: "assets/sprites/animation/5.ans".to_string(),
+                texts: vec![
+                    "he fall in his own insanity".to_string(),
+                    "and trapped, here, to show you this thing he made....".to_string(),
+                ],
+            },
+        ];
+        IntroState {
+            frames,
+            current_frame_index: 0,
+            current_text_index: 0,
+            animated_text: String::new(),
+            text_animation_timer: Instant::now(),
+            text_animation_interval: Duration::from_millis(50),
+            text_animation_finished: false,
+            post_text_delay_timer: None,
+            is_fading_out: false,
+            fade_out_timer: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +197,11 @@ pub struct GameState {
     pub pending_teleport_destination: Option<(u16, u16, i32, i32, String, u32)>,
     pub game_over_active: bool,
     pub resized: bool,
+    pub intro_active: bool,
+    pub intro_state: IntroState,
+    pub is_fading_in_from_intro: bool,
+    #[serde(skip)]
+    pub fade_in_from_intro_timer: Option<Instant>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -197,6 +282,10 @@ impl GameState {
             pending_teleport_destination: None,
             game_over_active: false,
             resized: false,
+            intro_active: true,
+            intro_state: IntroState::new(),
+            is_fading_in_from_intro: false,
+            fade_in_from_intro_timer: None,
         }
     }
 
@@ -242,6 +331,28 @@ impl GameState {
         delta_time: std::time::Duration,
         audio: &mut crate::audio::Audio,
     ) {
+        if self.intro_active {
+            self.update_intro(key_states, audio);
+            return;
+        }
+
+        if self.is_fading_in_from_intro {
+            let fade_duration = Duration::from_secs(1);
+            if self.fade_in_from_intro_timer.is_none() {
+                self.fade_in_from_intro_timer = Some(Instant::now());
+            }
+            if let Some(timer) = self.fade_in_from_intro_timer {
+                let elapsed = timer.elapsed();
+                if elapsed >= fade_duration {
+                    self.deltarune.level = 0;
+                    self.is_fading_in_from_intro = false;
+                } else {
+                    let progress = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+                    self.deltarune.level = (100.0 - (progress * 100.0)).max(0.0) as u8;
+                }
+            }
+        }
+
         if self.is_flickering {
             if self.flicker_timer.elapsed() >= self.flicker_duration {
                 self.show_flicker_black_screen = !self.show_flicker_black_screen;
@@ -340,6 +451,7 @@ impl GameState {
         if !(*context.show_message && *context.block_player_movement_on_message)
             && self.teleport_state == TeleportState::None
             && !self.is_placing_sprite
+            && !self.is_fading_in_from_intro
         {
             self.player.update(&mut context, key_states, delta_time);
 
@@ -723,6 +835,81 @@ impl GameState {
             for (key, pressed) in key_states {
                 if *pressed {
                     self.debug_info.push(format!("{:?}: pressed ", key));
+                }
+            }
+        }
+    }
+
+    pub fn update_intro(
+        &mut self,
+        _key_states: &HashMap<KeyCode, bool>,
+        audio: &mut crate::audio::Audio,
+    ) {
+        let intro = &mut self.intro_state;
+
+        if intro.is_fading_out {
+            let fade_duration = Duration::from_secs(1);
+            if let Some(timer) = intro.fade_out_timer {
+                let elapsed = timer.elapsed();
+                if elapsed >= fade_duration {
+                    self.deltarune.level = 100;
+                    self.intro_active = false;
+                    self.is_fading_in_from_intro = true;
+                } else {
+                    let progress = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+                    self.deltarune.level = (progress * 100.0).min(100.0) as u8;
+                }
+            }
+            return;
+        }
+
+        if intro.current_frame_index >= intro.frames.len() {
+            intro.is_fading_out = true;
+            intro.fade_out_timer = Some(Instant::now());
+            return;
+        }
+
+        let current_frame = &intro.frames[intro.current_frame_index];
+        let current_text = &current_frame.texts[intro.current_text_index];
+
+        if !intro.text_animation_finished {
+            if intro.text_animation_timer.elapsed() >= intro.text_animation_interval {
+                let current_len = intro.animated_text.chars().count();
+                if current_len < current_text.chars().count() {
+                    intro
+                        .animated_text
+                        .push(current_text.chars().nth(current_len).unwrap());
+                    audio.play_text_sound();
+                    intro.text_animation_timer = Instant::now();
+                    intro.text_animation_interval =
+                        Duration::from_millis(thread_rng().gen_range(50..=100));
+                } else {
+                    intro.text_animation_finished = true;
+                    intro.post_text_delay_timer = Some(Instant::now());
+                }
+            }
+        }
+
+        if intro.text_animation_finished {
+            if let Some(timer) = intro.post_text_delay_timer {
+                if timer.elapsed() >= Duration::from_secs(1) {
+                    if intro.current_text_index < current_frame.texts.len() - 1 {
+                        intro.current_text_index += 1;
+                        intro.animated_text.clear();
+                        intro.text_animation_finished = false;
+                        intro.post_text_delay_timer = None;
+                    } else {
+                        intro.current_frame_index += 1;
+                        intro.current_text_index = 0;
+                        intro.animated_text.clear();
+                        intro.text_animation_finished = false;
+                        intro.post_text_delay_timer = None;
+
+                        if intro.current_frame_index >= intro.frames.len() {
+                            intro.is_fading_out = true;
+                            intro.fade_out_timer = Some(Instant::now());
+                        }
+                    }
                 }
             }
         }

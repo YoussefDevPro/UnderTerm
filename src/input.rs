@@ -34,6 +34,19 @@ pub fn process_events(
                     continue;
                 }
 
+                if game_state.intro_active {
+                    match key.kind {
+                        event::KeyEventKind::Press => {
+                            key_states.insert(key.code, true);
+                        }
+                        event::KeyEventKind::Release => {
+                            key_states.insert(key.code, false);
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 if game_state.dialogue_active {
                     if key.code == KeyCode::Enter && key.kind == event::KeyEventKind::Press {
                         if game_state.dialogue_manager.text_animation_finished {

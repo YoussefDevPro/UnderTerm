@@ -6,7 +6,6 @@ use ansi_to_tui::IntoText;
 use figlet_rs::FIGfont;
 use ratatui::prelude::Alignment;
 use ratatui::prelude::Text;
-use std::time::Instant;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -24,6 +23,85 @@ fn convert_and_fix_t(font: &FIGfont, text: &str) -> String {
     } else {
         "FIGLET CONVERSION FAILED".to_string()
     }
+}
+
+fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
+    let size = frame.area();
+    frame.render_widget(Block::default().bg(Color::Rgb(0, 0, 0)), size);
+
+    let intro = &game_state.intro_state;
+    if intro.current_frame_index >= intro.frames.len() {
+        return;
+    }
+
+    let current_frame = &intro.frames[intro.current_frame_index];
+
+    // draw ANSI art
+    let ansi_content = load_sprite_asset_str!(current_frame.ansi_path.as_str());
+    let fixed_content = if cfg!(windows) {
+        ansi_content.replace("\r\n", "\n")
+    } else {
+        ansi_content.to_string()
+    };
+    let ansi_text = fixed_content.as_bytes().into_text().unwrap();
+
+    let ansi_height = ansi_text.lines.len() as u16;
+    let mut ansi_width = 0;
+    for line in ansi_text.lines.iter() {
+        let line_width = line.width() as u16;
+        if line_width > ansi_width {
+            ansi_width = line_width;
+        }
+    }
+
+    let ansi_x = size.width.saturating_sub(ansi_width) / 2;
+    let text_area_height = 10;
+    let ansi_y = (size
+        .height
+        .saturating_sub(ansi_height)
+        .saturating_sub(text_area_height)
+        / 2)
+    .saturating_sub(2);
+
+    let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_width, ansi_height);
+    frame.render_widget(Paragraph::new(ansi_text), ansi_area);
+
+    // Draw text at the bottom
+    let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+    let fig_text_str = convert_and_fix_t(&font, &intro.animated_text);
+    let text_paragraph = Paragraph::new(fig_text_str)
+        .wrap(ratatui::widgets::Wrap { trim: false })
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Rgb(0, 0, 0))
+                .add_modifier(Modifier::BOLD),
+        );
+
+    let message_height = 10;
+    let bottom_margin = 5;
+    let horizontal_margin = 40;
+
+    let message_area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(message_height),
+            Constraint::Length(bottom_margin),
+        ])
+        .split(size)[1];
+
+    let message_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(horizontal_margin),
+            Constraint::Min(0),
+            Constraint::Length(horizontal_margin),
+        ])
+        .split(message_area)[1];
+
+    frame.render_widget(Clear, message_area);
+    frame.render_widget(text_paragraph, message_area);
 }
 
 fn draw_enemy_ansi(frame: &mut Frame) {
@@ -362,6 +440,11 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     }
 
     let size = frame.area();
+
+    if game_state.intro_active {
+        draw_intro(frame, game_state);
+        return;
+    }
 
     if game_state.dialogue_active {
         draw_dialogue(frame, game_state);

@@ -2,6 +2,30 @@
 macro_rules! load_sprite_asset_str {
     ($path:expr) => {
         match $path {
+            "assets/sprites/animation/0.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/0.ans"
+            )),
+            "assets/sprites/animation/1.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/1.ans"
+            )),
+            "assets/sprites/animation/2.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/2.ans"
+            )),
+            "assets/sprites/animation/3.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/3.ans"
+            )),
+            "assets/sprites/animation/4.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/4.ans"
+            )),
+            "assets/sprites/animation/5.ans" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/sprites/animation/5.ans"
+            )),
             "assets/sprites/faces/face_3.ans" => include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/assets/sprites/faces/face_3.ans"
