@@ -5,8 +5,8 @@ use super::map::Map;
 use super::player::{Player, PlayerUpdateContext};
 use ansi_to_tui::IntoText;
 use crossterm::event::KeyCode;
-use rand::Rng;
 use rand::thread_rng;
+use rand::Rng;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::text::{Line, Span, Text};
@@ -66,38 +66,41 @@ impl IntroState {
             IntroFrame {
                 ansi_path: "assets/sprites/animation/0.ans".to_string(),
                 texts: vec![
-                    "All started one day, when youssef had no fucking project to work on"
-                        .to_string(),
-                    "he was feeling useless, and the only solution...".to_string(),
+                    "All started one day...".to_string(),
+                    "when youssef had no project...".to_string(),
+                    "he was feeling useless...".to_string(),
                 ],
             },
             IntroFrame {
                 ansi_path: "assets/sprites/animation/1.ans".to_string(),
                 texts: vec![
-                    "was to thenk hard".to_string(),
-                    "extremly hard..".to_string(),
-                    "until, got an idea..".to_string(),
+                    "The only solution...".to_string(),
+                    "was to think hard...".to_string(),
+                    "extremely hard...".to_string(),
                 ],
             },
             IntroFrame {
                 ansi_path: "assets/sprites/animation/2.ans".to_string(),
                 texts: vec![
-                    "he remembered of undertale, a game he really enjoyed playing it".to_string(),
-                    "and because he is a terminal nerd, he got a nerdy idea...".to_string(),
+                    "until he got an idea...".to_string(),
+                    "He remembered Undertale...".to_string(),
+                    "a game he really enjoyed.".to_string(),
                 ],
             },
             IntroFrame {
                 ansi_path: "assets/sprites/animation/3.ans".to_string(),
                 texts: vec![
-                    "to make the fucking game run in the terminal..".to_string(),
-                    "BECAUSE, why not..".to_string(),
+                    "Being a terminal nerd...".to_string(),
+                    "he decided to make it...".to_string(),
+                    "in the terminal.".to_string(),
+                    "He fell into his own insanity...".to_string(),
                 ],
             },
             IntroFrame {
                 ansi_path: "assets/sprites/animation/5.ans".to_string(),
                 texts: vec![
-                    "he fall in his own insanity".to_string(),
-                    "and trapped, here, to show you this thing he made....".to_string(),
+                    "and now is trapped here...".to_string(),
+                    "to show you this thing he made.".to_string(),
                 ],
             },
         ];
@@ -882,7 +885,7 @@ impl GameState {
                     audio.play_text_sound();
                     intro.text_animation_timer = Instant::now();
                     intro.text_animation_interval =
-                        Duration::from_millis(thread_rng().gen_range(50..=100));
+                        Duration::from_millis(thread_rng().gen_range(70..=120));
                 } else {
                     intro.text_animation_finished = true;
                     intro.post_text_delay_timer = Some(Instant::now());
@@ -892,7 +895,7 @@ impl GameState {
 
         if intro.text_animation_finished {
             if let Some(timer) = intro.post_text_delay_timer {
-                if timer.elapsed() >= Duration::from_secs(1) {
+                if timer.elapsed() >= Duration::from_millis(1200) {
                     if intro.current_text_index < current_frame.texts.len() - 1 {
                         intro.current_text_index += 1;
                         intro.animated_text.clear();

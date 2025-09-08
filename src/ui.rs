@@ -67,17 +67,6 @@ fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
     // Draw text at the bottom
-    let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
-    let fig_text_str = convert_and_fix_t(&font, &intro.animated_text);
-    let text_paragraph = Paragraph::new(fig_text_str)
-        .wrap(ratatui::widgets::Wrap { trim: false })
-        .style(
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::Rgb(0, 0, 0))
-                .add_modifier(Modifier::BOLD),
-        );
-
     let message_height = 10;
     let bottom_margin = 5;
     let horizontal_margin = 40;
@@ -100,8 +89,36 @@ fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
         ])
         .split(message_area)[1];
 
+    let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+    let wrapped_text = wrap_text_to_width(&intro.animated_text, message_area.width.saturating_sub(2));
+    let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
+    let fig_text_height = fig_text_str.lines().count() as u16;
+
+    let intro_text_block = Block::default()
+        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
+
     frame.render_widget(Clear, message_area);
-    frame.render_widget(text_paragraph, message_area);
+    frame.render_widget(intro_text_block, message_area);
+
+    let inner_area = message_area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+    let vertical_padding = inner_area.height.saturating_sub(fig_text_height) / 2;
+
+    let vertical_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(vertical_padding),
+            Constraint::Length(fig_text_height),
+            Constraint::Min(0),
+        ])
+        .split(inner_area);
+
+    let text_draw_area = vertical_chunks[1];
+
+    let text_paragraph = Paragraph::new(fig_text_str)
+        .style(Style::default().fg(Color::White))
+        .alignment(Alignment::Center);
+
+    frame.render_widget(text_paragraph, text_draw_area);
 }
 
 fn draw_enemy_ansi(frame: &mut Frame) {

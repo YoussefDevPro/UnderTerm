@@ -283,7 +283,7 @@ fn draw_debug_panel(frame: &mut Frame, game_state: &GameState) {
         .border_style(
             Style::default()
                 .fg(Color::Rgb(255, 255, 255))
-                .bg(Color::Rgb(255, 255, 255)),
+                .bg(Color::Rgb(0, 0, 0)),
         )
         .style(
             Style::default()
