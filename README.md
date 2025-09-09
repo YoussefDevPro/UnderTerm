@@ -9,7 +9,7 @@ undertale in the terminal, ig ദ്ദി/ᐠ｡_｡ᐟ\
 ## How to run this thing
 - download the binary in [link](https://github.com/YoussefDevPro/UnderTerm/releases/tag/v-0.6.9)
 - then u make the font size of ur terminal smaller
-- For Windows users, it's recommended to use [Kitty terminal](https://sw.kovidgoyal.net/kitty/) due to poor ANSI support in default Windows terminals. ANSI escape codes are used extensively to render sprites and other graphical elements, sorry for that, but i spent the whole day trying to fix this issue.
+- For Windows users, it's recommended to use [alacritty](https://alacritty.org/) due to poor ANSI support in default Windows terminals. ANSI escape codes are used extensively to render sprites and other graphical elements, sorry for that, but i spent the whole day trying to fix this issue.
 - uhh, ENJOY ദ്ദി/ᐠ｡_｡'ᐟ\, ig
 
 

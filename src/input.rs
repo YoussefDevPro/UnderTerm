@@ -8,6 +8,22 @@ use serde_json;
 
 use crate::game::state::{GameState, TeleportCreationState};
 
+#[cfg(windows)]
+fn map_key(key_code: KeyCode) -> KeyCode {
+    match key_code {
+        KeyCode::Char('H') => KeyCode::Up,
+        KeyCode::Char('P') => KeyCode::Down,
+        KeyCode::Char('K') => KeyCode::Left,
+        KeyCode::Char('M') => KeyCode::Right,
+        _ => key_code,
+    }
+}
+
+#[cfg(not(windows))]
+fn map_key(key_code: KeyCode) -> KeyCode {
+    key_code
+}
+
 pub fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
     loop {
         let event = event::read()?;
@@ -37,10 +53,10 @@ pub fn process_events(
                 if game_state.intro_active {
                     match key.kind {
                         event::KeyEventKind::Press => {
-                            key_states.insert(key.code, true);
+                            key_states.insert(map_key(key.code), true);
                         }
                         event::KeyEventKind::Release => {
-                            key_states.insert(key.code, false);
+                            key_states.insert(map_key(key.code), false);
                         }
                         _ => {}
                     }
@@ -48,7 +64,7 @@ pub fn process_events(
                 }
 
                 if game_state.dialogue_active {
-                    if key.code == KeyCode::Enter && key.kind == event::KeyEventKind::Press {
+                    if map_key(key.code) == KeyCode::Enter && key.kind == event::KeyEventKind::Press {
                         if game_state.dialogue_manager.text_animation_finished {
                             let is_last_dialogue = game_state.dialogue_manager.advance_dialogue();
                             if is_last_dialogue {
@@ -74,7 +90,7 @@ pub fn process_events(
                 }
 
                 if game_state.is_text_input_active {
-                    match key.code {
+                    match map_key(key.code) {
                         KeyCode::Char(c) => {
                             if game_state.teleport_creation_state
                                 == TeleportCreationState::EnteringMapName
@@ -255,7 +271,7 @@ pub fn process_events(
                 }
 
                 if game_state.is_event_input_active {
-                    match key.code {
+                    match map_key(key.code) {
                         KeyCode::Char(c) => game_state.text_input_buffer.push(c),
                         KeyCode::Backspace => {
                             game_state.text_input_buffer.pop();
@@ -342,8 +358,8 @@ pub fn process_events(
 
                 match key.kind {
                     event::KeyEventKind::Press => {
-                        key_states.insert(key.code, true);
-                        if key.code == KeyCode::Esc {
+                        key_states.insert(map_key(key.code), true);
+                        if map_key(key.code) == KeyCode::Esc {
                             if game_state.esc_press_start_time.is_none() {
                                 game_state.esc_dot_timer = Instant::now();
                             }
@@ -355,7 +371,7 @@ pub fn process_events(
                             if let Some(map_to_modify) =
                                 game_state.loaded_maps.get_mut(&current_map_key)
                             {
-                                match key.code {
+                                match map_key(key.code) {
                                     KeyCode::Up => map_to_modify.kind = map_to_modify.kind.previous(),
                                     KeyCode::Down => map_to_modify.kind = map_to_modify.kind.next(),
                                     KeyCode::Enter => {
@@ -375,7 +391,7 @@ pub fn process_events(
                                 }
                             }
                         } else if debug::input::handle_debug_input(key, game_state) {
-                        } else if key.code == KeyCode::Enter {
+                        } else if map_key(key.code) == KeyCode::Enter {
                             if !game_state.show_message {
                                 if let Some(box_id) = game_state.current_interaction_box_id {
                                     let current_map_key = (game_state.current_map_row, game_state.current_map_col);
@@ -425,25 +441,25 @@ pub fn process_events(
                                     game_state.dismiss_message();
                                 }
                             }
-                        } else if key.code == KeyCode::Char('+') {
+                        } else if map_key(key.code) == KeyCode::Char('+') {
                             game_state.deltarune.increase();
-                        } else if key.code == KeyCode::Char('-') {
+                        } else if map_key(key.code) == KeyCode::Char('-') {
                             game_state.deltarune.decrease();
-                        } else if key.code == KeyCode::Char('q') {
+                        } else if map_key(key.code) == KeyCode::Char('q') {
                             game_state.save_game_state()?;
                             return Ok(true);
-                        } else if key.code == KeyCode::Char('p') {
+                        } else if map_key(key.code) == KeyCode::Char('p') {
                             game_state.save_game_state()?;
                             game_state.message = "Game saved!".to_string();
                             game_state.show_message = true;
                             game_state.message_animation_start_time = Instant::now();
                             game_state.animated_message_content.clear();
-                        } else if key.code == KeyCode::F(2) {
+                        } else if map_key(key.code) == KeyCode::F(2) {
                             game_state.debug_mode = !game_state.debug_mode;
                             if game_state.debug_mode {
                                 audio.play_open_settings_sound();
                             }
-                        } else if key.code == KeyCode::Char('m') {
+                        } else if map_key(key.code) == KeyCode::Char('m') {
                             let state_json = serde_json::to_string_pretty(game_state).unwrap();
                             std::fs::write("debug.txt", state_json).unwrap();
                             game_state.message = "Game state saved to debug.txt".to_string();
@@ -453,17 +469,17 @@ pub fn process_events(
                         }
                     }
                     event::KeyEventKind::Release => {
-                        key_states.insert(key.code, false);
-                        if key.code == KeyCode::Esc {
+                        key_states.insert(map_key(key.code), false);
+                        if map_key(key.code) == KeyCode::Esc {
                             if game_state.esc_press_start_time.is_some() {
                                 game_state.esc_dot_timer = Instant::now();
                             }
                             game_state.esc_press_start_time = None;
                         }
-                        if key.code == KeyCode::Char('o') && game_state.debug_mode {
+                        if map_key(key.code) == KeyCode::Char('o') && game_state.debug_mode {
                             game_state.show_collision_box = false;
                         }
-                        if key.code == KeyCode::Char('b') && game_state.debug_mode {
+                        if map_key(key.code) == KeyCode::Char('b') && game_state.debug_mode {
                             game_state.show_collision_box = false;
                         }
                     }
