@@ -329,7 +329,8 @@ fn draw_thank_you_screen(frame: &mut Frame, game_state: &mut GameState) {
     let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_draw_width, ansi_draw_height);
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
-    let font = FIGfont::from_file("assets/fonts/3d.flf").unwrap();
+    let font_content = include_str!("../assets/fonts/3d.flf");
+    let font = FIGfont::from_content(font_content).unwrap();
     let thank_you_text = "Thanks for playing ?";
     let fig_text = game_state.darken_text(
         Text::raw(convert_and_fix_t(&font, thank_you_text)),
