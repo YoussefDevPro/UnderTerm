@@ -1,0 +1,5 @@
+This is a test panic to verify the crash handler.
+Panic occurred in file 'src/main.rs' at line 13 
+
+Backtrace:
+Backtrace [{ fn: "under_term::crash_handler::set_panic_hook::{{closure}}" }, { fn: "std::panicking::panic_with_hook" }, { fn: "std::panicking::panic_handler::{{closure}}" }, { fn: "std::sys::backtrace::__rust_end_short_backtrace" }, { fn: "__rustc::rust_begin_unwind" }, { fn: "core::panicking::panic_fmt" }, { fn: "under_term::run_app" }, { fn: "under_term::main" }, { fn: "std::sys::backtrace::__rust_begin_short_backtrace" }, { fn: "std::rt::lang_start::{{closure}}" }, { fn: "std::rt::lang_start_internal" }, { fn: "main" }, { fn: "__libc_start_main" }, { fn: "_start" }]
