@@ -11,10 +11,10 @@ use crate::game::state::{GameState, TeleportCreationState};
 #[cfg(windows)]
 fn map_key(key_code: KeyCode) -> KeyCode {
     match key_code {
-        KeyCode::Char('H') => KeyCode::Up,
-        KeyCode::Char('P') => KeyCode::Down,
-        KeyCode::Char('K') => KeyCode::Left,
-        KeyCode::Char('M') => KeyCode::Right,
+        KeyCode::Char('W') => KeyCode::Up,
+        KeyCode::Char('A') => KeyCode::Down,
+        KeyCode::Char('S') => KeyCode::Left,
+        KeyCode::Char('D') => KeyCode::Right,
         _ => key_code,
     }
 }
