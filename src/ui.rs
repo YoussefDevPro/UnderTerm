@@ -89,7 +89,8 @@ fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
         ])
         .split(message_area)[1];
 
-    let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+    let font_content = include_str!("../assets/fonts/Calvin S.flf");
+    let font = FIGfont::from_content(font_content).unwrap();
     let wrapped_text = wrap_text_to_width(&intro.animated_text, message_area.width.saturating_sub(2));
     let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
     let fig_text_height = fig_text_str.lines().count() as u16;
@@ -240,7 +241,8 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
             face_area,
         );
 
-        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+        let font_content = include_str!("../assets/fonts/Calvin S.flf");
+    let font = FIGfont::from_content(font_content).unwrap();
 
         let mut chunks = Vec::new();
         let visible_text = dialogue
@@ -724,7 +726,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .padding(ratatui::widgets::Padding::new(8, 8, 1, 1))
             .title("Message");
 
-        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
+        let font_content = include_str!("../assets/fonts/Calvin S.flf");
+    let font = FIGfont::from_content(font_content).unwrap();
         let ascii_art = convert_and_fix_t(&font, &game_state.animated_message_content);
         let message_paragraph = Paragraph::new(ascii_art)
             .wrap(ratatui::widgets::Wrap { trim: false })
