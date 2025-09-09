@@ -406,8 +406,6 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         );
         frame.render_widget(Paragraph::new(peefest_text), peefest_area);
 
-        let font = FIGfont::from_file("assets/fonts/Calvin S.flf").unwrap();
-
         let messages = vec![
             "please make ur terminal window bigger",
             "or make the font size of ur terminal smaller",
@@ -419,38 +417,36 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .saturating_add(2);
 
         for msg_line in messages {
-            let fig_text = Text::raw(convert_and_fix_t(&font, msg_line));
-            let fig_text_lines: Vec<String> =
-                fig_text.lines.iter().map(|l| l.to_string()).collect();
-            let fig_text_height = fig_text_lines.len() as u16;
-            let mut fig_text_width = 0;
-            for line in fig_text_lines {
-                let line_width = line.len() as u16;
-                if line_width > fig_text_width {
-                    fig_text_width = line_width;
+            let text = Text::raw(msg_line);
+            let text_height = text.lines.len() as u16;
+            let mut text_width = 0;
+            for line in text.lines.iter() {
+                let line_width = line.width() as u16;
+                if line_width > text_width {
+                    text_width = line_width;
                 }
             }
 
-            let fig_text_draw_width = fig_text_width.min(size.width);
-            let fig_text_draw_height = fig_text_height.min(size.height.saturating_sub(current_y));
+            let text_draw_width = text_width.min(size.width);
+            let text_draw_height = text_height.min(size.height.saturating_sub(current_y));
 
-            let text_x = (size.width.saturating_sub(fig_text_draw_width)) / 2;
+            let text_x = (size.width.saturating_sub(text_draw_width)) / 2;
             let text_y = current_y;
 
             let text_area = ratatui::layout::Rect::new(
                 text_x,
                 text_y,
-                fig_text_draw_width,
-                fig_text_draw_height,
+                text_draw_width,
+                text_draw_height,
             );
             frame.render_widget(
-                Paragraph::new(fig_text)
+                Paragraph::new(text)
                     .wrap(ratatui::widgets::Wrap { trim: false })
                     .alignment(Alignment::Center),
                 text_area,
             );
 
-            current_y = current_y.saturating_add(fig_text_draw_height);
+            current_y = current_y.saturating_add(text_draw_height);
         }
 
         return;

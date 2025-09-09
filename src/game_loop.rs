@@ -46,12 +46,7 @@ pub fn run(
             }
 
             let current_frame_size = terminal.size()?;
-            // Add this line to update last known state
-            crash_handler::update_last_known_state(
-                current_frame_size.width,
-                current_frame_size.height,
-                game_state.dialogue_active,
-            );
+            
 
             let game_should_exit = false;
             game_state.update(
