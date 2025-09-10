@@ -1,31 +1,22 @@
 use std::{
     collections::HashMap,
     io,
-    sync::mpsc,
-    thread,
     time::{Duration, Instant},
 };
 
+use crossterm::event;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::{
     audio::Audio,
     game::{config::FRAME_RATE, state::GameState},
-    input, ui, crash_handler,
+    input, ui,
 };
 
 pub fn run(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     game_state: &mut GameState,
 ) -> io::Result<()> {
-    let (tx, rx) = mpsc::channel();
-
-    thread::spawn(move || {
-        if let Err(e) = input::input_handler(tx) {
-            eprintln!("Input handler error: {:?}", e);
-        }
-    });
-
     let mut last_frame_time = Instant::now();
     let mut audio = Audio::new().unwrap();
 
@@ -37,8 +28,11 @@ pub fn run(
             let delta_time = last_frame_time.elapsed();
             last_frame_time = Instant::now();
 
-            if input::process_events(&rx, game_state, &mut key_states, &mut audio)? {
-                return Ok(());
+            while event::poll(Duration::default())? {
+                let event = event::read()?;
+                if input::process_event(event, game_state, &mut key_states, &mut audio)? {
+                    return Ok(());
+                }
             }
 
             if game_state.esc_hold_dots >= 4 {
@@ -46,7 +40,6 @@ pub fn run(
             }
 
             let current_frame_size = terminal.size()?;
-            
 
             let game_should_exit = false;
             game_state.update(

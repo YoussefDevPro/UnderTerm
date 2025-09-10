@@ -15,7 +15,8 @@ fn run_app() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     if let Err(e) = stdout().execute(PushKeyboardEnhancementFlags(
-        KeyboardEnhancementFlags::REPORT_EVENT_TYPES,
+        KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+            | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES,
     )) {
         eprintln!("Could not enable keyboard enhancement flags: {:?}", e);
     }

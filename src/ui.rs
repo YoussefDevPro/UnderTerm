@@ -66,7 +66,6 @@ fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
     let ansi_area = ratatui::layout::Rect::new(ansi_x, ansi_y, ansi_width, ansi_height);
     frame.render_widget(Paragraph::new(ansi_text), ansi_area);
 
-    // Draw text at the bottom
     let message_height = 10;
     let bottom_margin = 5;
     let horizontal_margin = 40;
@@ -91,17 +90,20 @@ fn draw_intro(frame: &mut Frame, game_state: &mut GameState) {
 
     let font_content = include_str!("../assets/fonts/Calvin S.flf");
     let font = FIGfont::from_content(font_content).unwrap();
-    let wrapped_text = wrap_text_to_width(&intro.animated_text, message_area.width.saturating_sub(2));
+    let wrapped_text =
+        wrap_text_to_width(&intro.animated_text, message_area.width.saturating_sub(2));
     let fig_text_str = convert_and_fix_t(&font, &wrapped_text);
     let fig_text_height = fig_text_str.lines().count() as u16;
 
-    let intro_text_block = Block::default()
-        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
+    let intro_text_block = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
 
     frame.render_widget(Clear, message_area);
     frame.render_widget(intro_text_block, message_area);
 
-    let inner_area = message_area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+    let inner_area = message_area.inner(ratatui::layout::Margin {
+        vertical: 1,
+        horizontal: 1,
+    });
     let vertical_padding = inner_area.height.saturating_sub(fig_text_height) / 2;
 
     let vertical_chunks = Layout::default()
@@ -242,7 +244,7 @@ fn draw_dialogue(frame: &mut Frame, game_state: &mut GameState) {
         );
 
         let font_content = include_str!("../assets/fonts/Calvin S.flf");
-    let font = FIGfont::from_content(font_content).unwrap();
+        let font = FIGfont::from_content(font_content).unwrap();
 
         let mut chunks = Vec::new();
         let visible_text = dialogue
@@ -361,14 +363,12 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
     let size = frame.area();
 
     if size.width < MIN_TERMINAL_WIDTH || size.height < MIN_TERMINAL_HEIGHT {
-        // Clear any existing message state
-        game_state.show_message = false; // Ensure the general message box is not drawn
-        game_state.animated_message_content.clear(); // Clear animated content
-        game_state.message.clear(); // Clear the message itself
+        game_state.show_message = false;
+        game_state.animated_message_content.clear();
+        game_state.message.clear();
 
         frame.render_widget(Block::default().bg(Color::Reset), size);
 
-        // Manually draw the "Terminal too small" debug message
         let debug_msg = format!(
             "Terminal too small! Current: {}x{}. Min: {}x{}",
             size.width, size.height, MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT
@@ -436,12 +436,8 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             let text_x = (size.width.saturating_sub(text_draw_width)) / 2;
             let text_y = current_y;
 
-            let text_area = ratatui::layout::Rect::new(
-                text_x,
-                text_y,
-                text_draw_width,
-                text_draw_height,
-            );
+            let text_area =
+                ratatui::layout::Rect::new(text_x, text_y, text_draw_width, text_draw_height);
             frame.render_widget(
                 Paragraph::new(text)
                     .wrap(ratatui::widgets::Wrap { trim: false })
@@ -472,7 +468,6 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
         return;
     }
 
-    // If dialogue is not active and screen is black, draw the thank you screen
     if !game_state.dialogue_active && game_state.deltarune.level >= 99 {
         draw_thank_you_screen(frame, game_state);
         return;
@@ -709,7 +704,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
 
     if game_state.show_message {
         if game_state.animated_message_content.is_empty() {
-            return; // Don't draw if message content is empty
+            return;
         }
         let message_block = Block::default()
             .borders(Borders::ALL)
@@ -728,7 +723,7 @@ pub fn draw(frame: &mut Frame, game_state: &mut GameState) {
             .title("Message");
 
         let font_content = include_str!("../assets/fonts/Calvin S.flf");
-    let font = FIGfont::from_content(font_content).unwrap();
+        let font = FIGfont::from_content(font_content).unwrap();
         let ascii_art = convert_and_fix_t(&font, &game_state.animated_message_content);
         let message_paragraph = Paragraph::new(ascii_art)
             .wrap(ratatui::widgets::Wrap { trim: false })

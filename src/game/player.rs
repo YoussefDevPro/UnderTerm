@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use super::config::{
-    ANIMATION_FRAME_DURATION, DEBUG_MOVEMENT_FRAME_INTERVAL, PLAYER_HORIZONTAL_SPEED,
-    PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH, PLAYER_SPEED,
+    ANIMATION_FRAME_DURATION, PLAYER_HORIZONTAL_SPEED, PLAYER_SPEED, DEBUG_MOVEMENT_FRAME_INTERVAL,
+    PLAYER_INTERACTION_BOX_HEIGHT, PLAYER_INTERACTION_BOX_WIDTH,
 };
 use super::map::Map;
 use ansi_to_tui::IntoText;
@@ -276,6 +276,8 @@ impl Player {
         let left = *key_states.get(&KeyCode::Left).unwrap_or(&false);
         let right = *key_states.get(&KeyCode::Right).unwrap_or(&false);
 
+        self.is_walking = up || down || left || right;
+
         if up && !down && left && !right {
             self.direction = PlayerDirection::BackLeft;
         } else if up && !down && right && !left {
@@ -384,18 +386,7 @@ impl Player {
                 .min((current_map.height.saturating_sub(player_sprite_height)) as f32);
         }
 
-        if self.x != original_player_x || self.y != original_player_y {
-            if !self.is_walking {
-                self.animation_frame = 1;
-                self.animation_timer = Instant::now();
-            }
-            self.is_walking = true;
-            self.walking_stop_timer = Instant::now();
-        } else {
-            if self.is_walking && self.walking_stop_timer.elapsed() >= self.walking_stop_delay {
-                self.is_walking = false;
-            }
-        }
+        
 
         self.update_animation(ANIMATION_FRAME_DURATION);
     }
