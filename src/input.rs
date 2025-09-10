@@ -8,20 +8,14 @@ use serde_json;
 
 use crate::game::state::{GameState, TeleportCreationState};
 
-#[cfg(windows)]
 fn map_key(key_code: KeyCode) -> KeyCode {
     match key_code {
-        KeyCode::Char('W') => KeyCode::Up,
-        KeyCode::Char('A') => KeyCode::Down,
-        KeyCode::Char('S') => KeyCode::Left,
-        KeyCode::Char('D') => KeyCode::Right,
+        KeyCode::Char('W') | KeyCode::Char('w') => KeyCode::Up,
+        KeyCode::Char('A') | KeyCode::Char('a') => KeyCode::Left,
+        KeyCode::Char('S') | KeyCode::Char('s') => KeyCode::Down,
+        KeyCode::Char('D') | KeyCode::Char('d') => KeyCode::Right,
         _ => key_code,
     }
-}
-
-#[cfg(not(windows))]
-fn map_key(key_code: KeyCode) -> KeyCode {
-    key_code
 }
 
 pub fn input_handler(tx: mpsc::Sender<Event>) -> io::Result<()> {
