@@ -1,3 +1,6 @@
+# Alert : thats the most rejected project in som, #1 most rejected and reshiped project (bc of a certain VM) 
+isn't that wonderful
+# ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
  ```
     ░█░█░█▀█░█▀▄░█▀▀░█▀▄░▀█▀░█▀▀░█▀▄░█▄█ 
     ░█░█░█░█░█░█░█▀▀░█▀▄░░█░░█▀▀░█▀▄░█░█
