@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crossterm::event;
+
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::{
@@ -28,11 +28,8 @@ pub fn run(
             let delta_time = last_frame_time.elapsed();
             last_frame_time = Instant::now();
 
-            while event::poll(Duration::default())? {
-                let event = event::read()?;
-                if input::process_event(event, game_state, &mut key_states, &mut audio)? {
-                    return Ok(());
-                }
+            if input::process_inputs(game_state, &mut key_states, &mut audio)? {
+                return Ok(());
             }
 
             if game_state.esc_hold_dots >= 4 {

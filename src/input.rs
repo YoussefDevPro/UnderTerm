@@ -1,4 +1,3 @@
-use crate::debug;
 use std::{collections::HashMap, io, time::Instant};
 
 use crossterm::event::{self, Event, KeyCode};
@@ -6,6 +5,10 @@ use crossterm::event::{self, Event, KeyCode};
 use serde_json;
 
 use crate::game::state::{GameState, TeleportCreationState};
+
+#[cfg(windows)]
+#[cfg_attr(windows, path = "windows_input.rs")]
+mod windows_input;
 
 fn map_key(key_code: KeyCode) -> KeyCode {
     match key_code {
@@ -15,6 +18,35 @@ fn map_key(key_code: KeyCode) -> KeyCode {
         KeyCode::Char('D') | KeyCode::Char('d') => KeyCode::Right,
         _ => key_code,
     }
+}
+
+#[cfg(windows)]
+pub fn process_inputs(
+    game_state: &mut GameState,
+    key_states: &mut HashMap<KeyCode, bool>,
+    audio: &mut crate::audio::Audio,
+) -> io::Result<bool> {
+    let events = windows_input::read_key_events()?;
+    let mut should_quit = false;
+    for event in events {
+        if process_event(event, game_state, key_states, audio)? {
+            should_quit = true;
+        }
+    }
+    Ok(should_quit)
+}
+
+#[cfg(not(windows))]
+pub fn process_inputs(
+    game_state: &mut GameState,
+    key_states: &mut HashMap<KeyCode, bool>,
+    audio: &mut crate::audio::Audio,
+) -> io::Result<bool> {
+    if event::poll(std::time::Duration::from_millis(16))? {
+        let event = event::read()?;
+        return process_event(event, game_state, key_states, audio);
+    }
+    Ok(false)
 }
 
 pub fn process_event(
@@ -376,7 +408,6 @@ pub fn process_event(
                                 _ => {}
                             }
                         }
-                    } else if debug::input::handle_debug_input(key, game_state) {
                     } else if map_key(key.code) == KeyCode::Enter {
                         if !game_state.show_message {
                             if let Some(box_id) = game_state.current_interaction_box_id {
