@@ -1,7 +1,6 @@
 use crate::debug;
 use std::{collections::HashMap, io, sync::mpsc, time::Instant};
 
-
 use crossterm::event::{self, Event, KeyCode};
 
 use serde_json;
@@ -58,7 +57,8 @@ pub fn process_events(
                 }
 
                 if game_state.dialogue_active {
-                    if map_key(key.code) == KeyCode::Enter && key.kind == event::KeyEventKind::Press {
+                    if map_key(key.code) == KeyCode::Enter && key.kind == event::KeyEventKind::Press
+                    {
                         if game_state.dialogue_manager.text_animation_finished {
                             let is_last_dialogue = game_state.dialogue_manager.advance_dialogue();
                             if is_last_dialogue {
@@ -107,14 +107,18 @@ pub fn process_events(
                             if game_state.is_creating_map {
                                 let map_name = game_state.text_input_buffer.trim().to_string();
                                 if !map_name.is_empty() {
-                                    if let Ok(new_map) = crate::game::map::Map::create_new(&map_name) {
-                                        let map_parts: Vec<&str> = new_map.name.split('_').collect();
+                                    if let Ok(new_map) =
+                                        crate::game::map::Map::create_new(&map_name)
+                                    {
+                                        let map_parts: Vec<&str> =
+                                            new_map.name.split('_').collect();
                                         let new_map_row: i32 = map_parts[1].parse().unwrap_or(0);
                                         let new_map_col: i32 = map_parts[2].parse().unwrap_or(0);
                                         game_state
                                             .loaded_maps
                                             .insert((new_map_row, new_map_col), new_map);
-                                        game_state.message = format!("Created new map: {}", map_name);
+                                        game_state.message =
+                                            format!("Created new map: {}", map_name);
                                     } else {
                                         game_state.message =
                                             format!("Error creating map: {}", map_name);
@@ -134,7 +138,8 @@ pub fn process_events(
                                     .trim()
                                     .to_string();
                                 if target_map_name.is_empty() {
-                                    game_state.message = "Target map name cannot be empty.".to_string();
+                                    game_state.message =
+                                        "Target map name cannot be empty.".to_string();
                                     game_state.show_message = true;
                                     game_state.message_animation_start_time = Instant::now();
                                     game_state.animated_message_content.clear();
@@ -157,10 +162,13 @@ pub fn process_events(
                                                             .loaded_maps
                                                             .get_mut(&current_map_key)
                                                         {
-                                                            if let Some(box_to_update) = map_to_modify
-                                                                .select_object_boxes
-                                                                .iter_mut()
-                                                                .find(|b| b.id == pending_box.id)
+                                                            if let Some(box_to_update) =
+                                                                map_to_modify
+                                                                    .select_object_boxes
+                                                                    .iter_mut()
+                                                                    .find(|b| {
+                                                                        b.id == pending_box.id
+                                                                    })
                                                             {
                                                                 box_to_update.events.push(
                                                                     crate::game::map::Event::TeleportPlayer {
@@ -222,7 +230,8 @@ pub fn process_events(
                                     game_state.message_animation_start_time = Instant::now();
                                     game_state.animated_message_content.clear();
                                 }
-                            } else if let Some(ref mut pending_box) = game_state.pending_select_box {
+                            } else if let Some(ref mut pending_box) = game_state.pending_select_box
+                            {
                                 pending_box
                                     .messages
                                     .push(game_state.text_input_buffer.clone());
@@ -243,11 +252,13 @@ pub fn process_events(
                             if game_state.is_creating_map {
                                 game_state.is_creating_map = false;
                                 game_state.message = "Map creation cancelled.".to_string();
-                            } else if game_state.teleport_creation_state != TeleportCreationState::None
+                            } else if game_state.teleport_creation_state
+                                != TeleportCreationState::None
                             {
                                 game_state.teleport_creation_state = TeleportCreationState::None;
                                 game_state.pending_select_box = None;
-                                game_state.message = "Teleport line creation cancelled.".to_string();
+                                game_state.message =
+                                    "Teleport line creation cancelled.".to_string();
                                 game_state.block_player_movement_on_message = true;
                             } else {
                                 game_state.is_event_input_active = true;
@@ -330,7 +341,8 @@ pub fn process_events(
                                 {
                                     map_to_modify.add_select_object_box(pending_box);
                                     if let Err(e) = map_to_modify.save_data() {
-                                        game_state.message = format!("Failed to save map data: {}", e);
+                                        game_state.message =
+                                            format!("Failed to save map data: {}", e);
                                     } else {
                                         game_state.message =
                                             "SelectObjectBox created and saved.".to_string();
@@ -366,11 +378,14 @@ pub fn process_events(
                                 game_state.loaded_maps.get_mut(&current_map_key)
                             {
                                 match map_key(key.code) {
-                                    KeyCode::Up => map_to_modify.kind = map_to_modify.kind.previous(),
+                                    KeyCode::Up => {
+                                        map_to_modify.kind = map_to_modify.kind.previous()
+                                    }
                                     KeyCode::Down => map_to_modify.kind = map_to_modify.kind.next(),
                                     KeyCode::Enter => {
                                         if let Err(e) = map_to_modify.save_data() {
-                                            game_state.message = format!("Failed to save map: {}", e);
+                                            game_state.message =
+                                                format!("Failed to save map: {}", e);
                                         } else {
                                             game_state.message =
                                                 format!("Map kind set to {:?}", map_to_modify.kind);
@@ -388,13 +403,22 @@ pub fn process_events(
                         } else if map_key(key.code) == KeyCode::Enter {
                             if !game_state.show_message {
                                 if let Some(box_id) = game_state.current_interaction_box_id {
-                                    let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                    if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                                        if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
+                                    let current_map_key =
+                                        (game_state.current_map_row, game_state.current_map_col);
+                                    if let Some(current_map) =
+                                        game_state.loaded_maps.get(&current_map_key)
+                                    {
+                                        if let Some(interacting_box) = current_map
+                                            .select_object_boxes
+                                            .iter()
+                                            .find(|b| b.id == box_id)
+                                        {
                                             if !interacting_box.messages.is_empty() {
-                                                game_state.message = interacting_box.messages[0].clone();
+                                                game_state.message =
+                                                    interacting_box.messages[0].clone();
                                                 game_state.show_message = true;
-                                                game_state.message_animation_start_time = Instant::now();
+                                                game_state.message_animation_start_time =
+                                                    Instant::now();
                                                 game_state.animated_message_content.clear();
                                                 game_state.message_animation_finished = false;
                                                 game_state.current_message_index = 1;
@@ -409,13 +433,27 @@ pub fn process_events(
                             if game_state.show_message {
                                 if game_state.message_animation_finished {
                                     if let Some(box_id) = game_state.current_interaction_box_id {
-                                        let current_map_key = (game_state.current_map_row, game_state.current_map_col);
-                                        if let Some(current_map) = game_state.loaded_maps.get(&current_map_key) {
-                                            if let Some(interacting_box) = current_map.select_object_boxes.iter().find(|b| b.id == box_id) {
-                                                if game_state.current_message_index < interacting_box.messages.len() {
-                                                    game_state.message = interacting_box.messages[game_state.current_message_index].clone();
+                                        let current_map_key = (
+                                            game_state.current_map_row,
+                                            game_state.current_map_col,
+                                        );
+                                        if let Some(current_map) =
+                                            game_state.loaded_maps.get(&current_map_key)
+                                        {
+                                            if let Some(interacting_box) = current_map
+                                                .select_object_boxes
+                                                .iter()
+                                                .find(|b| b.id == box_id)
+                                            {
+                                                if game_state.current_message_index
+                                                    < interacting_box.messages.len()
+                                                {
+                                                    game_state.message = interacting_box.messages
+                                                        [game_state.current_message_index]
+                                                        .clone();
                                                     game_state.show_message = true;
-                                                    game_state.message_animation_start_time = Instant::now();
+                                                    game_state.message_animation_start_time =
+                                                        Instant::now();
                                                     game_state.animated_message_content.clear();
                                                     game_state.message_animation_finished = false;
                                                     game_state.current_message_index += 1;
@@ -425,8 +463,11 @@ pub fn process_events(
                                                     game_state.dismiss_message();
                                                     game_state.current_interaction_box_id = None;
                                                     game_state.current_message_index = 0;
-                                                    let _events_to_process: Vec<crate::game::map::Event> = events;
-                                                    game_state.recently_teleported_from_box_id = Some(box_id);
+                                                    let _events_to_process: Vec<
+                                                        crate::game::map::Event,
+                                                    > = events;
+                                                    game_state.recently_teleported_from_box_id =
+                                                        Some(box_id);
                                                 }
                                             }
                                         }
